@@ -1,6 +1,6 @@
 name: exoscale-metrics-collector
 title: exoscale-metrics-collector
-version: master
+version: "0.0"
 start_page: ROOT:index.adoc
 nav:
   - modules/ROOT/partials/nav.adoc
