@@ -1,3 +1,0 @@
-xref:how-tos/installation.adoc[Installation]
-
-xref:references/parameters.adoc[Parameters]
