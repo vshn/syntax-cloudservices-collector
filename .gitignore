@@ -4,13 +4,15 @@
 
 # Build
 # TODO: Adjust binary file name
-/go-bootstrap
+/exoscale-metrics-collector
 *.out
+/component/compiled
+/component/vendor
 
 # Docs
 /.cache/
 /.public/
 /node_modules/
 
-# work
-/.work/
+# Configuration
+env

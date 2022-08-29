@@ -3,14 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	egoscale "github.com/exoscale/egoscale/v2"
 	"os"
-	"os/signal"
-	"sync/atomic"
-	"syscall"
 	"time"
-
-	"github.com/go-logr/logr"
-	"github.com/urfave/cli/v2"
 )
 
 var (
@@ -18,101 +13,55 @@ var (
 	version = "unknown"
 	commit  = "-dirty-"
 	date    = time.Now().Format("2006-01-02")
+	appName = "exoscale-metrics-collector"
 
-	// TODO: Adjust app name
-	appName     = "go-bootstrap"
-	appLongName = "a generic bootstrapping project"
-
-	// TODO: Adjust or clear env var prefix
-	// envPrefix is the global prefix to use for the keys in environment variables
-	envPrefix = "BOOTSTRAP"
+	// constants
+	keyEnvVariable    = "EXOSCALE_API_KEY"
+	secretEnvVariable = "EXOSCALE_API_SECRET"
 )
 
 func main() {
-	ctx, stop, app := newApp()
-	defer stop()
-	err := app.RunContext(ctx, os.Args)
-	// If required flags aren't set, it will return with error before we could set up logging
+	ctx := context.Background()
+	err := sync(ctx)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
+		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 		os.Exit(1)
 	}
+	os.Exit(0)
 }
 
-func newApp() (context.Context, context.CancelFunc, *cli.App) {
-	logInstance := &atomic.Value{}
-	logInstance.Store(logr.Discard())
-	app := &cli.App{
-		Name:     appName,
-		Usage:    appLongName,
-		Version:  fmt.Sprintf("%s, revision=%s, date=%s", version, commit, date),
-		Compiled: compilationDate(),
-
-		EnableBashCompletion: true,
-
-		Before: setupLogging,
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:    "debug",
-				Aliases: []string{"verbose", "d"},
-				Usage:   "sets the log level to debug",
-				EnvVars: envVars("DEBUG"),
-			},
-			&cli.StringFlag{
-				Name:        "log-format",
-				Usage:       "sets the log format (values: [json, console])",
-				EnvVars:     envVars("LOG_FORMAT"),
-				DefaultText: "console",
-			},
-		},
-		Commands: []*cli.Command{
-			newExampleCommand(),
-		},
-		ExitErrHandler: func(ctx *cli.Context, err error) {
-			if err != nil {
-				AppLogger(ctx).Error(err, "fatal error")
-				cli.HandleExitCoder(cli.Exit("", 1))
-			}
-		},
+func cfg() (string, string) {
+	exoscaleApiKey := os.Getenv(keyEnvVariable)
+	if exoscaleApiKey == "" {
+		fmt.Fprintf(os.Stderr, "ERROR: Environment variable %s must be set\n", keyEnvVariable)
+		os.Exit(1)
 	}
-	hasSubcommands := len(app.Commands) > 0
-	app.Action = rootAction(hasSubcommands)
-	// There is logr.NewContext(...) which returns a context that carries the logger instance.
-	// However, since we are configuring and replacing this logger after starting up and parsing the flags,
-	// we'll store a thread-safe atomic reference.
-	parentCtx := context.WithValue(context.Background(), loggerContextKey{}, logInstance)
-	ctx, stop := signal.NotifyContext(parentCtx, syscall.SIGINT, syscall.SIGTERM)
-	return ctx, stop, app
-}
 
-func rootAction(hasSubcommands bool) func(context *cli.Context) error {
-	return func(ctx *cli.Context) error {
-		if hasSubcommands {
-			return cli.ShowAppHelp(ctx)
-		}
-		return LogMetadata(ctx)
+	exoscaleApiSecret := os.Getenv(secretEnvVariable)
+	if exoscaleApiSecret == "" {
+		fmt.Fprintf(os.Stderr, "ERROR: Environment variable %s must be set\n", secretEnvVariable)
+		os.Exit(1)
 	}
+
+	return exoscaleApiKey, exoscaleApiSecret
 }
 
-// env combines envPrefix with given suffix delimited by underscore.
-func env(suffix string) string {
-	return envPrefix + "_" + suffix
-}
+func sync(ctx context.Context) error {
+	exoscaleApiKey, exoscaleApiSecret := cfg()
 
-// envVars combines envPrefix with each given suffix delimited by underscore.
-func envVars(suffixes ...string) []string {
-	arr := make([]string, len(suffixes))
-	for i := range suffixes {
-		arr[i] = env(suffixes[i])
-	}
-	return arr
-}
-
-func compilationDate() time.Time {
-	compiled, err := time.Parse(time.RFC3339, date)
+	client, err := egoscale.NewClient(exoscaleApiKey, exoscaleApiSecret, egoscale.ClientOptWithAPIEndpoint("https://api-ch-gva-2.exoscale.com"))
 	if err != nil {
-		// an empty Time{} causes cli.App to guess it from binary's file timestamp.
-		return time.Time{}
+		return err
 	}
-	return compiled
+
+	resp, err := client.ListSosBucketsUsageWithResponse(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range *resp.JSON200.SosBucketsUsage {
+		fmt.Printf("name: %s, zoneName: %s, size: %d, createdAt: %s\n", *v.Name, *v.ZoneName, *v.Size, *v.CreatedAt)
+	}
+
+	return nil
 }

@@ -11,12 +11,6 @@ MAKEFLAGS += --no-builtin-variables
 # General variables
 include Makefile.vars.mk
 
-# Following includes do not print warnings or error if files aren't found
-# Optional Documentation module.
--include docs/antora-preview.mk docs/antora-build.mk
-# Optional kind module
--include kind/kind.mk
-
 .PHONY: help
 help: ## Show this help
 	@grep -E -h '\s##\s' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -32,6 +26,10 @@ build-bin: fmt vet ## Build binary
 .PHONY: build-docker
 build-docker: build-bin ## Build docker image
 	$(DOCKER_CMD) build -t $(CONTAINER_IMG) .
+
+.PHONY: docs-serve
+docs-serve: ## Preview the documentation
+	$(ANTORA_PREVIEW_CMD)
 
 .PHONY: test
 test: test-go ## All-in-one test
@@ -58,6 +56,6 @@ generate: ## Generate additional code and artifacts
 	@go generate ./...
 
 .PHONY: clean
-clean: kind-clean ## Cleans local build artifacts
+clean: ## Cleans local build artifacts
 	docker rmi $(CONTAINER_IMG) || true
-	rm -rf docs/node_modules $(docs_out_dir) dist .cache $(WORK_DIR)
+	rm -rf docs/node_modules $(docs_out_dir) dist .cache

@@ -1,15 +1,3 @@
-// TODO: Edit navigation
-* xref:index.adoc[Introduction]
-* https://github.com/vshn/go-bootstrap/releases[Changelog,window=_blank] 🔗
+xref:how-tos/installation.adoc[Installation]
 
-.Tutorials
-//* xref:tutorials/example.adoc[Example Tutorial]
-
-.How To
-//* xref:how-tos/example.adoc[Example How-To]
-
-.Technical reference
-//* xref:references/example.adoc[Example Reference]
-
-.Explanation
-//* xref:explanations/example.adoc[Example Explanation]
+xref:references/parameters.adoc[Parameters]

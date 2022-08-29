@@ -1,0 +1,43 @@
+= Parameters
+
+Because this component depends on the component https://hub.syn.tools/appuio-cloud-reporting/references/parameters.html[appuio-cloud-reporting], some parameters are taken from that component and are not individually configurable in this component.
+In particular:
+
+* https://hub.syn.tools/appuio-cloud-reporting/references/parameters.html#_namespace[namespace]
+* https://hub.syn.tools/appuio-cloud-reporting/references/parameters.html#_database[database]
+
+The following list includes only parameters of this component.
+The parent key for all of them is `exoscale_metrics_collector`.
+
+See xref:how-tos/installation.adoc[Installation] for a full example.
+
+== `images`
+
+[horizontal]
+type:: dictionary
+default:: https://github.com/vshn/exoscale-metrics-collector/blob/master/component/class/defaults.yml[See `class/defaults.yml].
+
+Dictionary containing the container images used by this component.
+
+
+== `secrets.exoscale.stringData.api_key`
+
+[horizontal]
+type:: string
+default:: Required.
+
+The Exoscale API key.
+
+You need to get the token from the https://portal.exoscale.com[Exoscale Console].
+You need to select the correct account (token is limited to one account), choose "IAM" in the menu and generate a new key pair.
+
+== `secrets.exoscale.stringData.api_secret`
+
+[horizontal]
+type:: string
+default:: Required.
+
+The Exoscale API secret.
+
+Second part of the Exoscale API credentials.
+See api_key for instructions.
