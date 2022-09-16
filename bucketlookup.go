@@ -28,7 +28,7 @@ func (this *NamespaceInfo) String() string {
 }
 
 func extractNamespaceInfoByBucket(k8sConfig *K8sConfig,
-	list *unstructured.UnstructuredList,
+	objectBuckets *unstructured.UnstructuredList,
 	orgByNamespace map[string]string,
 	namespaceInfoByBucket map[string]*NamespaceInfo) error {
 
@@ -36,7 +36,7 @@ func extractNamespaceInfoByBucket(k8sConfig *K8sConfig,
 	namespaceInfos := make(map[string]*NamespaceInfo)
 
 	// FIXME: The nested 'if's should be rewritten. Either use a flat 'if' hierarchy or find some way to use an object mapper to get typed access to the metadata.
-	for _, objectBucket := range list.Items {
+	for _, objectBucket := range objectBuckets.Items {
 		if metadata, ok := objectBucket.UnstructuredContent()["metadata"]; ok {
 			if metadataMap, ok := metadata.(map[string]interface{}); ok {
 				if name, ok := metadataMap["name"]; ok {
@@ -142,21 +142,21 @@ func generateNamespaceLookupMap(ctx context.Context, k8sConfigs map[string]*K8sC
 
 		// Generate namespace to organization lookup table.
 		// This fetches all namespaces from the cluster and looks at the annotations to find the organization.
-		result, err := k8s.Resource(objectBucketsResource).List(ctx, metav1.ListOptions{})
+		namespaces, err := k8s.Resource(namespaceResource).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return nil, err
 		}
-		orgByNamespace, err := extractOrgByNamespace(result)
+		orgByNamespace, err := extractOrgByNamespace(namespaces)
 		if err != nil {
 			return nil, err
 		}
 
 		// Get ObjectBuckets and put information into namespaceInfoByBucket
-		result, err = k8s.Resource(objectBucketsResource).List(ctx, metav1.ListOptions{})
+		objectBuckets, err := k8s.Resource(objectBucketsResource).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return nil, err
 		}
-		err = extractNamespaceInfoByBucket(k8sConfig, result, orgByNamespace, namespaceInfoByBucket)
+		err = extractNamespaceInfoByBucket(k8sConfig, objectBuckets, orgByNamespace, namespaceInfoByBucket)
 	}
 
 	return namespaceInfoByBucket, nil
