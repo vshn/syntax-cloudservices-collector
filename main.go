@@ -3,10 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	egoscale "github.com/exoscale/egoscale/v2"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"os"
+	"os/signal"
+	"sync/atomic"
+	"syscall"
 	"time"
+
+	"github.com/go-logr/logr"
+	"github.com/urfave/cli/v2"
 )
 
 var (
@@ -14,49 +18,89 @@ var (
 	version = "unknown"
 	commit  = "-dirty-"
 	date    = time.Now().Format("2006-01-02")
-	appName = "exoscale-metrics-collector"
 
-	// constants
-	keyEnvVariable        = "EXOSCALE_API_KEY"
-	secretEnvVariable     = "EXOSCALE_API_SECRET"
-	k8sApiPrefix          = "K8S_API_"
-	k8sTokenPrefix        = "K8S_TOKEN_"
-	orgAnnotation         = "appuio.io/organization"
-	objectBucketsResource = schema.GroupVersionResource{Group: "appcat.vshn.io", Version: "v1", Resource: "objectbuckets"}
-	namespaceResource     = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
+	appName     = "exoscale-metrics-collector"
+	appLongName = "Metrics collector which gathers metrics information for exoscale services"
+
+	envPrefix = ""
 )
 
-func main() {
-	ctx := context.Background()
-	err := sync(ctx)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
-		os.Exit(1)
-	}
-	os.Exit(0)
+func init() {
+	// Remove `-v` short option from --version flag
+	cli.VersionFlag.(*cli.BoolFlag).Aliases = nil
 }
 
-func sync(ctx context.Context) error {
-	exoscaleApiKey, exoscaleApiSecret, k8sConfigs := cfg()
-
-	// Fetch bucket name to namespace/tenant information lookup table from the configured k8s clusters
-	namespaceInfoByBucket, err := generateNamespaceLookupMap(ctx, k8sConfigs)
+func main() {
+	ctx, stop, app := newApp()
+	defer stop()
+	err := app.RunContext(ctx, os.Args)
+	// If required flags aren't set, it will return with error before we could set up logging
 	if err != nil {
-		return err
+		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
 	}
+}
 
-	// Fetch actual billing data from Exoscale
-	client, err := egoscale.NewClient(exoscaleApiKey, exoscaleApiSecret, egoscale.ClientOptWithAPIEndpoint("https://api-ch-gva-2.exoscale.com"))
-	if err != nil {
-		return err
-	}
-	resp, err := client.ListSosBucketsUsageWithResponse(ctx)
-	if err != nil {
-		return err
-	}
-	for _, v := range *resp.JSON200.SosBucketsUsage {
-		fmt.Printf("name: %s, zoneName: %s, size: %d, createdAt: %s, namespace info: %s\n", *v.Name, *v.ZoneName, *v.Size, *v.CreatedAt, namespaceInfoByBucket[*v.Name])
-	}
+func newApp() (context.Context, context.CancelFunc, *cli.App) {
+	logInstance := &atomic.Value{}
+	logInstance.Store(logr.Discard())
+	app := &cli.App{
+		Name:    appName,
+		Usage:   appLongName,
+		Version: fmt.Sprintf("%s, revision=%s, date=%s", version, commit, date),
 
-	return nil
+		EnableBashCompletion: true,
+
+		Before: setupLogging,
+		Flags: []cli.Flag{
+			&cli.IntFlag{
+				Name: "log-level", Aliases: []string{"v"}, EnvVars: envVars("LOG_LEVEL"),
+				Usage: "number of the log level verbosity",
+				Value: 0,
+			},
+			&cli.StringFlag{
+				Name: "log-format", EnvVars: envVars("LOG_FORMAT"),
+				Usage:       "sets the log format (values: [json, console])",
+				DefaultText: "console",
+			},
+		},
+		Commands: []*cli.Command{
+			NewCommand(),
+		},
+		ExitErrHandler: func(ctx *cli.Context, err error) {
+			if err != nil {
+				AppLogger(ctx).Error(err, "fatal error")
+				cli.HandleExitCoder(cli.Exit("", 1))
+			}
+		},
+	}
+	hasSubcommands := len(app.Commands) > 0
+	app.Action = rootAction(hasSubcommands)
+
+	parentCtx := context.WithValue(context.Background(), loggerContextKey{}, logInstance)
+	ctx, stop := signal.NotifyContext(parentCtx, syscall.SIGINT, syscall.SIGTERM)
+	return ctx, stop, app
+}
+
+func rootAction(hasSubcommands bool) func(context *cli.Context) error {
+	return func(ctx *cli.Context) error {
+		if hasSubcommands {
+			return cli.ShowAppHelp(ctx)
+		}
+		return LogMetadata(ctx)
+	}
+}
+
+// env combines envPrefix with given suffix delimited by underscore.
+func env(suffix string) string {
+	return envPrefix + suffix
+}
+
+// envVars combines envPrefix with each given suffix delimited by underscore.
+func envVars(suffixes ...string) []string {
+	arr := make([]string, len(suffixes))
+	for i := range suffixes {
+		arr[i] = env(suffixes[i])
+	}
+	return arr
 }
