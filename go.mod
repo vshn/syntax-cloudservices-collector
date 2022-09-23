@@ -12,7 +12,7 @@ require (
 	go.uber.org/zap v1.23.0
 	golang.org/x/exp v0.0.0-20220916125017-b168a2c6b86b
 	k8s.io/apimachinery v0.25.0
-	k8s.io/client-go v0.25.0
+	k8s.io/client-go/v11 v11.0.0+incompatible
 	sigs.k8s.io/controller-runtime v0.13.0
 )
 
