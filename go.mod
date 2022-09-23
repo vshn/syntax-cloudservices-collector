@@ -1,6 +1,6 @@
 module github.com/vshn/exoscale-metrics-collector
 
-go 1.18
+go 1.19
 
 require (
 	github.com/ccremer/go-command-pipeline v0.20.0
