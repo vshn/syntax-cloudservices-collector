@@ -8,6 +8,9 @@ on:
     branches:
       - master
 
+env:
+  COMPONENT_NAME: exoscale-metrics-collector
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -39,3 +42,12 @@ jobs:
         with:
           coverageLocations: cover.out:gocov
           prefix: github.com/${{ github.repository }}
+
+  golden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Golden diff
+        working-directory: component/
+        run: make test golden-diff-all

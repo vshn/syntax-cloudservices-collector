@@ -1,0 +1,15 @@
+parameters:
+  exoscale_metrics_collector:
+    secrets:
+      exoscale:
+        stringData:
+          api_key: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/key}"
+          api_secret: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/secret}"
+    images:
+      collector:
+        registry: 'ghcr.io'
+        repository: 'vshn/exoscale-metrics-collector'
+        tag: 'v0.0.2'
+    # Times in UTC! Don't run job around midnight as exoscale API may return incomplete data
+    # default: Every day at minute 10 past hour 4, 10, and 16.
+    schedule: '10 4,10,16 * * *'
