@@ -19,6 +19,13 @@ default:: https://github.com/vshn/exoscale-metrics-collector/blob/master/compone
 
 Dictionary containing the container images used by this component.
 
+== `schedule`
+
+[horizontal]
+type:: string
+default:: `10 4,10,16 * * *`
+
+The cron schedule at which the metrics collection job is spawned.
 
 == `secrets.exoscale.stringData.api_key`
 
