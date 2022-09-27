@@ -23,7 +23,7 @@ Dictionary containing the container images used by this component.
 
 [horizontal]
 type:: string
-default:: `10 4,10,16 * * *`
+default:: `10 10,16,20 * * *`
 
 The cron schedule at which the metrics collection job is spawned.
 

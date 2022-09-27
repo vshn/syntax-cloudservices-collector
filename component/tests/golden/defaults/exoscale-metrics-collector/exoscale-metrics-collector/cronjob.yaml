@@ -48,5 +48,5 @@ spec:
               name: exoscale-metrics-collector-backfill
               resources: {}
           restartPolicy: OnFailure
-  schedule: 10 4,10,16 * * *
+  schedule: 10 10,16,20 * * *
   successfulJobsHistoryLimit: 3

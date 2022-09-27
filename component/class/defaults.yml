@@ -11,5 +11,5 @@ parameters:
         repository: 'vshn/exoscale-metrics-collector'
         tag: 'v0.0.2'
     # Times in UTC! Don't run job around midnight as exoscale API may return incomplete data
-    # default: Every day at minute 10 past hour 4, 10, and 16.
-    schedule: '10 4,10,16 * * *'
+    # default: Every day at minute 10 past hour 10, 16 and 20.
+    schedule: '10 10,16,20 * * *'
