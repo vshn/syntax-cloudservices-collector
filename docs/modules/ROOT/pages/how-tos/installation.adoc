@@ -18,8 +18,8 @@ parameters:
     secrets:
       exoscale:
         stringData:
-          api_key:"?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/api_key}"
-          api_secret:"?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/api_secret}"
+          api_key: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/api_key}"
+          api_secret: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/api_secret}"
 ----
 
 See the xref:references/parameters.adoc[parameters] reference for a full list of parameters.
