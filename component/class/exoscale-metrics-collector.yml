@@ -5,7 +5,9 @@ parameters:
           - ${_base_directory}/component/app.jsonnet
         input_type: jsonnet
         output_path: apps/
+        output_type: yaml
       - input_paths:
           - ${_base_directory}/component/main.jsonnet
         input_type: jsonnet
-        output_path: exoscale-metrics-collector/
+        output_type: yaml
+        output_path: ${_instance}
