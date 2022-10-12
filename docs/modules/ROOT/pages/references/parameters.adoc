@@ -27,7 +27,7 @@ default:: `10 10,16,20 * * *`
 
 The cron schedule at which the metrics collection job is spawned.
 
-== `secrets.exoscale.stringData.api_key`
+== `secrets.credentials.stringData.EXOSCALE_API_KEY`
 
 [horizontal]
 type:: string
@@ -38,7 +38,7 @@ The Exoscale API key.
 You need to get the token from the https://portal.exoscale.com[Exoscale Console].
 You need to select the correct account (token is limited to one account), choose "IAM" in the menu and generate a new key pair.
 
-== `secrets.exoscale.stringData.api_secret`
+== `secrets.credentials.stringData.EXOSCALE_API_SECRET`
 
 [horizontal]
 type:: string
@@ -47,4 +47,22 @@ default:: Required.
 The Exoscale API secret.
 
 Second part of the Exoscale API credentials.
-See api_key for instructions.
+See EXOSCALE_API_KEY for instructions.
+
+== `secrets.credentials.stringData.K8S_SERVER_URL`
+
+[horizontal]
+type:: string
+default:: Required.
+
+The Kubernetes server URL.
+
+== `secrets.credentials.stringData.K8S_TOKEN`
+
+[horizontal]
+type:: string
+default:: Required.
+
+The token to connect to a Kubernetes cluster.
+
+The Service Account connected to this token should have `get` and `list` permissions to `buckets.exoscale.crossplane.io` managed resource.
