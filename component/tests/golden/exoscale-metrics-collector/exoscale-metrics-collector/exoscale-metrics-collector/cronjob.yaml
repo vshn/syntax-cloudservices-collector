@@ -34,16 +34,9 @@ spec:
                       name: reporting-db
                 - name: ACR_DB_URL
                   value: postgres://$(username):$(password)@reporting-db.appuio-reporting.svc:5432/reporting?sslmode=disable
-                - name: EXOSCALE_API_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      key: api_key
-                      name: exoscale
-                - name: EXOSCALE_API_SECRET
-                  valueFrom:
-                    secretKeyRef:
-                      key: api_secret
-                      name: exoscale
+              envFrom:
+                - secretRef:
+                    name: credentials-exoscale-metrics-collector
               image: ghcr.io/vshn/exoscale-metrics-collector:v0.0.2
               name: exoscale-metrics-collector-backfill
               resources: {}
