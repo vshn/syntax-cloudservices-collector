@@ -1,10 +1,14 @@
 parameters:
   exoscale_metrics_collector:
+    =_metadata:
+      multi_instance: true
     secrets:
-      exoscale:
+      credentials:
         stringData:
-          api_key: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/key}"
-          api_secret: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/secret}"
+          EXOSCALE_API_KEY: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/${_instance}/exoscale-key}"
+          EXOSCALE_API_SECRET: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/${_instance}/exoscale-secret}"
+          K8S_SERVER_URL: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/${_instance}/cluster-server}"
+          K8S_TOKEN: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/${_instance}/cluster-token}"
     images:
       collector:
         registry: 'ghcr.io'

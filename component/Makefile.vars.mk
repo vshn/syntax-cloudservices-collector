@@ -5,7 +5,7 @@ COMPONENT_SUBDIR ?= $(shell basename ${PWD})
 compiled_path   ?= compiled/$(COMPONENT_NAME)/$(COMPONENT_NAME)
 root_volume     ?= -v "$${PWD}/../:/$(COMPONENT_NAME)"
 compiled_volume ?= -v "$${PWD}/$(compiled_path):/$(COMPONENT_NAME)"
-commodore_args  ?= --search-paths . -n $(COMPONENT_NAME)
+commodore_args  ?= --search-paths . -n $(COMPONENT_NAME) --alias $(instance)
 
 ifneq "$(shell which docker 2>/dev/null)" ""
 	DOCKER_CMD    ?= $(shell which docker)
@@ -43,5 +43,5 @@ KUBENT_ARGS     ?= -c=false --helm2=false --helm3=false -e
 KUBENT_IMAGE    ?= docker.io/projectsyn/kubent:latest
 KUBENT_DOCKER   ?= $(DOCKER_CMD) $(DOCKER_ARGS) $(root_volume) --entrypoint=/app/kubent $(KUBENT_IMAGE)
 
-instance ?= defaults
-test_instances = tests/defaults.yml
+instance ?= exoscale-metrics-collector
+test_instances = tests/exoscale-metrics-collector.yml tests/collector-cloudscale-lpg-2.yml

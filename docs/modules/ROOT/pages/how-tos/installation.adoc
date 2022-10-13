@@ -4,6 +4,13 @@
 
 This component requires https://github.com/appuio/component-appuio-cloud-reporting[component-appuio-cloud-reporting] and is installed into the same namespace.
 This is required for this component to be able to access the billing database and its connection secrets.
+It also requires an Exoscale IAMKey and a Kubernetes/OpenShift Service Account token in the target cluster to get `buckets.exoscale.crossplane.io` resources.
+
+== Sources
+
+The data is matched from k8s cluster and Exoscale organization.
+The Kubernetes Service Account token is required to have `get` permissions on `Namespaces` and `buckets.exoscale.crossplane.io` resources.
+The Access Key (IAM Key) from an Exoscale organization is required to have read access across all SOS buckets.
 
 == Example
 
@@ -14,12 +21,7 @@ applications:
 
 parameters:
   exoscale_metrics_collector:
-    namespace: 'appuio-cloud-reporting'
-    secrets:
-      exoscale:
-        stringData:
-          api_key: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/api_key}"
-          api_secret: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/api_secret}"
+    schedule: '10 10,16,20 * * *'
 ----
 
 See the xref:references/parameters.adoc[parameters] reference for a full list of parameters.
