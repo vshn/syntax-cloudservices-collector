@@ -60,9 +60,8 @@ local secrets = [
                   name: 'exoscale-metrics-collector-backfill',
                   image: collectorImage,
                   args: [
-                    'exoscale-metrics-collector',
+                    'objectstorage',
                   ],
-                  command: [ 'sh', '-c' ],
                   envFrom: [
                     {
                       secretRef: {

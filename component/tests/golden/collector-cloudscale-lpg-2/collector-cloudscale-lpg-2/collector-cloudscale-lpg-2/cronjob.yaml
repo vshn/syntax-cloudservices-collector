@@ -17,10 +17,7 @@ spec:
         spec:
           containers:
             - args:
-                - exoscale-metrics-collector
-              command:
-                - sh
-                - -c
+                - objectstorage
               env:
                 - name: password
                   valueFrom:
@@ -37,7 +34,7 @@ spec:
               envFrom:
                 - secretRef:
                     name: credentials-collector-cloudscale-lpg-2
-              image: ghcr.io/vshn/exoscale-metrics-collector:v0.0.2
+              image: ghcr.io/vshn/exoscale-metrics-collector:v0.2.1
               name: exoscale-metrics-collector-backfill
               resources: {}
           restartPolicy: OnFailure

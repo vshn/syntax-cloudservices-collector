@@ -8,7 +8,6 @@ RUN \
     tzdata
 
 ENTRYPOINT ["exoscale-metrics-collector"]
-CMD ["objectstorage"]
 COPY exoscale-metrics-collector /usr/bin/
 
 USER 65536:0
