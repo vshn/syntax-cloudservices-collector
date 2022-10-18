@@ -34,7 +34,7 @@ spec:
               envFrom:
                 - secretRef:
                     name: credentials-exoscale-metrics-collector
-              image: ghcr.io/vshn/exoscale-metrics-collector:v0.2.2
+              image: ghcr.io/vshn/exoscale-metrics-collector:v0.2.3
               name: exoscale-metrics-collector-backfill
               resources: {}
           restartPolicy: OnFailure
