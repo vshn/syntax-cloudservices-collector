@@ -458,6 +458,8 @@ github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyC
 github.com/valyala/fasttemplate v1.2.1/go.mod h1:KHLXt3tVN2HBp8eijSv/kGJopbvo7S+qRAEEKiv+SiQ=
 github.com/vshn/cloudscale-metrics-collector v0.3.3 h1:81y66v4WV1dPYYf+gpPwyxHa2bDb+igSXXUIZF/1vrg=
 github.com/vshn/cloudscale-metrics-collector v0.3.3/go.mod h1:Ejyqp4eZDBrjnXJPA66ttA8cI3I06aa6W2CGxV2DB2o=
+github.com/vshn/cloudscale-metrics-collector v0.4.0 h1:hhqxPeQBo+nOHuHjlaRxw8i/nlloteIZDq3NccFnRXc=
+github.com/vshn/cloudscale-metrics-collector v0.4.0/go.mod h1:Ejyqp4eZDBrjnXJPA66ttA8cI3I06aa6W2CGxV2DB2o=
 github.com/vshn/provider-exoscale v0.1.0 h1:2qEYt37BYvTkIvPUYWmZ2pZ7stAy4rGl4CvqTL86CTk=
 github.com/vshn/provider-exoscale v0.1.0/go.mod h1:ilQ+p905LOQByfrwPMnm+kfYRoRn8yXax4i1TJaNYhQ=
 github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f/go.mod h1:N2zxlSyiKSe5eX1tZViRH5QA0qijqEDrYZiPEAiq3wU=
