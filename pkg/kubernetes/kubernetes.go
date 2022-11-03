@@ -16,11 +16,11 @@ func InitK8sClient(url, token string) (*client.Client, error) {
 		return nil, fmt.Errorf("cannot add k8s exoscale scheme: %w", err)
 	}
 	config := rest.Config{Host: url, BearerToken: token}
-	k8sClient, e := client.New(&config, client.Options{
+	k8sClient, err := client.New(&config, client.Options{
 		Scheme: scheme,
 	})
-	if e != nil {
-		return nil, fmt.Errorf("cannot initialise k8s client: %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("cannot initialize k8s client: %w", err)
 	}
 	return &k8sClient, nil
 }
