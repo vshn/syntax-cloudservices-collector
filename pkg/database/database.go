@@ -31,7 +31,7 @@ var (
 	product = db.Product{
 		Source: queryAndZone,
 		Target: sql.NullString{String: "1402", Valid: true},
-		Amount: 0.00066,
+		Amount: 0.000726,
 		Unit:   "GBDay",
 		During: db.InfiniteRange(),
 	}

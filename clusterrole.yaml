@@ -1,7 +1,3 @@
-# $ oc --as cluster-admin apply -f clusterrole.yaml 
-# $ oc -n default --as cluster-admin create serviceaccount vshn-exoscale-metrics-collector
-# $ oc --as cluster-admin adm policy add-cluster-role-to-user vshn-exoscale-metrics-collector system:serviceaccount:default:vshn-exoscale-metrics-collector
-# $ oc -n default --as cluster-admin serviceaccounts get-token vshn-exoscale-metrics-collector
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

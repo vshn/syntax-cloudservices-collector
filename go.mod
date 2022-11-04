@@ -11,7 +11,7 @@ require (
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/stretchr/testify v1.8.0
 	github.com/urfave/cli/v2 v2.20.3
-	github.com/vshn/cloudscale-metrics-collector v0.3.3
+	github.com/vshn/cloudscale-metrics-collector v0.4.0
 	github.com/vshn/provider-exoscale v0.1.0
 	go.uber.org/zap v1.23.0
 	k8s.io/apimachinery v0.25.0
