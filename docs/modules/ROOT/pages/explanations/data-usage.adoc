@@ -1,14 +1,14 @@
 = Data Usage
 
-This page gives a brief overview how buckets data usage is saved to the postgres billing database.
+This page gives a brief overview how resources data usage (e.g. buckets) is saved to the postgres billing database.
 
 == Data flow
 
 image::application-logic.drawio.svg[]
 
 == Data source
-- Buckets are fetched from Exoscale Provider and K8s Cluster.
-- The bucket names in Exoscale are unique across organisation which prevents clusters having same bucket names.
+- Resources (e.g. buckets, DBaaS, ...) are fetched from Exoscale Provider and K8s Cluster.
+- The resource names in Exoscale are unique across organisation which prevents clusters having same resource names.
 
 == Data saving
 

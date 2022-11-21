@@ -1,9 +1,11 @@
-package kubernetes
+package cluster
 
 import (
 	"fmt"
+
 	"github.com/vshn/provider-exoscale/apis"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -23,4 +25,14 @@ func InitK8sClient(url, token string) (*client.Client, error) {
 		return nil, fmt.Errorf("cannot initialize k8s client: %w", err)
 	}
 	return &k8sClient, nil
+}
+
+// InitK8sClientDynamic creates a dynamic k8s client from the server url and token url
+func InitK8sClientDynamic(url, token string) (dynamic.Interface, error) {
+	config := rest.Config{Host: url, BearerToken: token}
+	k8sClient, err := dynamic.NewForConfig(&config)
+	if err != nil {
+		return nil, fmt.Errorf("cannot initialize k8s client: %w", err)
+	}
+	return k8sClient, nil
 }

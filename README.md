@@ -13,8 +13,9 @@
 
 Batch job to sync usage data from the Exoscale API to the [APPUiO Cloud reporting](https://github.com/appuio/appuio-cloud-reporting/) database.
 
-See the [component documentation](https://hub.syn.tools/exoscale-metrics-collector/index.html) for more information.
+Metrics are collected taking into account product (e.g. `object-storage-storage:exoscale`), source (e.g. `exoscale:namespace`), tenant (as organization) and date time.
 
+See the [component documentation](https://hub.syn.tools/exoscale-metrics-collector/index.html) for more information.
 
 ## Getting started for developers
 
@@ -38,7 +39,18 @@ Then source the env file and run the client:
 ```
 $ . ./env
 $ make build
-$ ./exoscale-metrics-collector objectstorage
+```
+
+Then, run one of the available commands:
+
+* Object Storage:
+```
+$ ./exoscale-metrics-collector objectstorage 
+```
+
+* DBaaS (runs metrics collector for all supported databases):
+```
+$ ./exoscale-metrics-collector dbaas
 ```
 
 ### Billing Database
@@ -49,6 +61,52 @@ Provided that you have Docker installed, you can easily run a local instance of 
 $ cd appuio-cloud-reporting
 $ make docker-compose-up
 ```
+
+For the first time you start the database locally, check `Local Development` on the Readme in [appuio-cloud-reporting](https://github.com/appuio/appuio-cloud-reporting/blob/master/README.md#local-development) or follow these steps:
+* Next command asks for a password, it's "reporting":
+```
+$ createdb --username=reporting -h localhost -p 5432 appuio-cloud-reporting-test
+```
+
+* Then (no need to seed the database):
+```
+$ export ACR_DB_URL="postgres://reporting:reporting@localhost/appuio-cloud-reporting-test?sslmode=disable"
+$ go run . migrate
+```
+
+### Create Resources in Lab Cluster to test metrics collector
+
+You can first connect to your cluster and then create a claim for Postgres Database by applying a claim, for example:
+
+```
+apiVersion: appcat.vshn.io/v1
+kind: ExoscalePostgreSQL
+metadata:
+  namespace: default
+  name: exoscale-postgres-lab-test-1
+spec:
+  parameters:
+    backup:
+      timeOfDay: '13:00:00'
+    maintenance:
+      dayOfWeek: monday
+      timeOfDay: "12:00:00"
+    size:
+      plan: hobbyist-2
+    service:
+      majorVersion: "14"
+  writeConnectionSecretToRef:
+    name: postgres-connection-details
+```
+
+Once the database is created and `Ready`, you can run locally the command:
+```
+$ ./exoscale-metrics-collector dbaas
+```
+
+The same works for other resources. Just apply the right claim and run the proper command.
+
+And don't forget to delete the resource(s) you created once you're done testing.
 
 ### Exoscale API key and secret
 
@@ -72,7 +130,7 @@ $ oc -n default --as cluster-admin apply -f clusterrole-secret.yaml
 $ oc -n default --as cluster-admin get secret vshn-exoscale-metrics-collector-secret -o jsonpath='{.data.token}' | base64 -d
 ```
 
-Instuctions for OpenShift <=4.10:
+Instructions for OpenShift <=4.10:
 ```
 $ cd exoscale-metrics-collector
 $ oc -n default --as cluster-admin apply -f clusterrole.yaml 

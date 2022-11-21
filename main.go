@@ -21,8 +21,6 @@ var (
 
 	appName     = "exoscale-metrics-collector"
 	appLongName = "Metrics collector which gathers metrics information for exoscale services"
-
-	envPrefix = ""
 )
 
 func init() {
@@ -67,7 +65,8 @@ func newApp() (context.Context, context.CancelFunc, *cli.App) {
 			},
 		},
 		Commands: []*cli.Command{
-			NewCommand(),
+			newObjectStorageCommand(),
+			newDBaasSCommand(),
 		},
 		ExitErrHandler: func(ctx *cli.Context, err error) {
 			if err != nil {
