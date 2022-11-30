@@ -2,6 +2,8 @@ package database
 
 import (
 	"fmt"
+	"github.com/appuio/appuio-cloud-reporting/pkg/db"
+	"github.com/vshn/cloudscale-metrics-collector/pkg/factsmodel"
 	"strings"
 
 	pipeline "github.com/ccremer/go-command-pipeline"
@@ -80,12 +82,31 @@ func (d *DBaaSDatabase) ensureAggregatedServiceUsage(dctx *Context, aggregatedDa
 			p.NewStep("Begin database transaction", d.beginTransaction),
 			p.NewStep("Ensure necessary models", d.ensureModels),
 			p.NewStep("Get best match", d.getBestMatch),
-			p.NewStep("Save facts", d.saveFacts),
+			p.When(isFactsUpdatable, "Save to billing database", d.saveFacts),
 			p.NewStep("Commit transaction", d.commitTransaction),
 		).WithErrorHandler(d.rollback),
 	)
 
 	return p.RunWithContext(dctx)
+}
+
+// isFactsUpdatable makes sure that only missing data or higher quantity values are saved in the billing database
+func isFactsUpdatable(dctx *Context) bool {
+	log := ctrl.LoggerFrom(dctx)
+	fact, _ := factsmodel.GetByFact(dctx, dctx.transaction, &db.Fact{
+		DateTimeId: dctx.dateTime.Id,
+		QueryId:    dctx.query.Id,
+		TenantId:   dctx.tenant.Id,
+		CategoryId: dctx.category.Id,
+		ProductId:  dctx.product.Id,
+		DiscountId: dctx.discount.Id,
+	})
+	if fact == nil || fact.Quantity < *dctx.value {
+		return true
+	}
+	log.Info(fmt.Sprintf("Skipped saving, higher or equal number of instances is already recorded in the billing database "+
+		"for this hour: saved instance count %.0f, newer instance count %.0f", fact.Quantity, *dctx.value))
+	return false
 }
 
 type dbaasSourceString struct {

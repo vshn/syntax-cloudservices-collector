@@ -30,7 +30,7 @@ var (
 
 // Detail a helper structure for intermediate operations
 type Detail struct {
-	Organization, DBName, Namespace, Plan, Zone string
+	Organization, DBName, Namespace, Plan, Zone, Type string
 }
 
 // Context is the context of the DBaaS service
@@ -95,6 +95,7 @@ func (s *Service) fetchManagedDBaaS(ctx *Context) error {
 		for _, managedResource := range managedResources.Items {
 			dbaasDetail := Detail{
 				DBName: managedResource.GetName(),
+				Type:   groupVersionResource.Resource,
 			}
 			if organization, exist := managedResource.GetLabels()[service.OrganizationLabel]; exist {
 				dbaasDetail.Organization = organization
@@ -165,6 +166,7 @@ func aggregateDBaaS(ctx *Context) error {
 	log := ctrl.LoggerFrom(ctx)
 	log.Info("Aggregating DBaaS instances by namespace and plan")
 
+	// The DBaaS names are unique across DB types in an Exoscale organization.
 	dbaasServiceUsageMap := make(map[string]egoscale.DatabaseService, len(ctx.exoscaleDBaasS))
 	for _, usage := range ctx.exoscaleDBaasS {
 		dbaasServiceUsageMap[*usage.Name] = *usage
@@ -174,7 +176,8 @@ func aggregateDBaaS(ctx *Context) error {
 	for _, dbaasDetail := range ctx.dbaasDetails {
 		log.V(1).Info("Checking DBaaS", "instance", dbaasDetail.DBName)
 
-		if dbaasUsage, exists := dbaasServiceUsageMap[dbaasDetail.DBName]; exists {
+		dbaasUsage, exists := dbaasServiceUsageMap[dbaasDetail.DBName]
+		if exists && dbaasDetail.Type == groupVersionResources[*dbaasUsage.Type].Resource {
 			log.V(1).Info("Found exoscale dbaas usage", "instance", dbaasUsage.Name, "instance created", dbaasUsage.CreatedAt)
 			key := db.NewKey(dbaasDetail.Namespace, *dbaasUsage.Plan, *dbaasUsage.Type)
 			aggregated := aggregatedDBaasS[key]
