@@ -8,6 +8,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+const (
+	// SosType represents object storage storage type
+	SosType        ObjectType = "object-storage-storage"
+	querySos                  = string(SosType) + ":" + provider
+	defaultUnitSos            = "GBDay"
+)
+
 // SosDatabase contains the Database struct needed
 type SosDatabase struct {
 	Database

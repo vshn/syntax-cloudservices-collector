@@ -9,79 +9,129 @@ import (
 	"github.com/appuio/appuio-cloud-reporting/pkg/db"
 )
 
+const provider = "exoscale"
+
+var initConfigs = map[ObjectType]InitConfig{
+
+	// ObjectStorage specific objects for billing database
+	SosType: {
+		products: []db.Product{
+			{
+				Source: querySos,
+				Target: sql.NullString{String: "1402", Valid: true},
+				Amount: 0.000726,
+				Unit:   "GBDay",
+				During: db.InfiniteRange(),
+			},
+		},
+		discount: db.Discount{
+			Source:   string(SosType),
+			Discount: 0,
+			During:   db.InfiniteRange(),
+		},
+		query: db.Query{
+			Name:        querySos,
+			Description: "Object Storage - Storage (exoscale.com)",
+			Query:       "",
+			Unit:        "GBDay",
+			During:      db.InfiniteRange(),
+		},
+	},
+
+	// Postgres specific objects for billing database
+	PostgresDBaaSType: {
+		products: generatePostgresProducts(),
+		discount: db.Discount{
+			Source:   string(PostgresDBaaSType),
+			Discount: 0,
+			During:   db.InfiniteRange(),
+		},
+		query: db.Query{
+			Name:        queryDBaaSPostgres,
+			Description: "Database Service - PostgreSQL (exoscale.com)",
+			Query:       "",
+			Unit:        defaultUnitDBaaS,
+			During:      db.InfiniteRange(),
+		},
+	},
+
+	// Mysql specific objects for billing database
+	MysqlDBaaSType: {
+		products: generateMysqlProducts(),
+		discount: db.Discount{
+			Source:   string(MysqlDBaaSType),
+			Discount: 0,
+			During:   db.InfiniteRange(),
+		},
+		query: db.Query{
+			Name:        queryDBaaSMysql,
+			Description: "Database Service - MySQL (exoscale.com)",
+			Query:       "",
+			Unit:        defaultUnitDBaaS,
+			During:      db.InfiniteRange(),
+		},
+	},
+
+	// Opensearch specific objects for billing database
+	OpensearchDBaaSType: {
+		products: generateOpensearchProducts(),
+		discount: db.Discount{
+			Source:   string(OpensearchDBaaSType),
+			Discount: 0,
+			During:   db.InfiniteRange(),
+		},
+		query: db.Query{
+			Name:        queryDBaaSOpensearch,
+			Description: "Database Service - Opensearch (exoscale.com)",
+			Query:       "",
+			Unit:        defaultUnitDBaaS,
+			During:      db.InfiniteRange(),
+		},
+	},
+
+	// Redis specific objects for billing database
+	RedisDBaaSType: {
+		products: generateRedisProducts(),
+		discount: db.Discount{
+			Source:   string(RedisDBaaSType),
+			Discount: 0,
+			During:   db.InfiniteRange(),
+		},
+		query: db.Query{
+			Name:        queryDBaaSRedis,
+			Description: "Database Service - Redis (exoscale.com)",
+			Query:       "",
+			Unit:        defaultUnitDBaaS,
+			During:      db.InfiniteRange(),
+		},
+	},
+
+	// Kafka specific objects for billing database
+	KafkaDBaaSType: {
+		products: generateKafkaProducts(),
+		discount: db.Discount{
+			Source:   string(KafkaDBaaSType),
+			Discount: 0,
+			During:   db.InfiniteRange(),
+		},
+		query: db.Query{
+			Name:        queryDBaaSKafka,
+			Description: "Database Service - Kafka (exoscale.com)",
+			Query:       "",
+			Unit:        defaultUnitDBaaS,
+			During:      db.InfiniteRange(),
+		},
+	},
+}
+
 // ObjectType defines model for DBaaS types
 type ObjectType string
 
-const (
-	// PostgresDBaaSType represents postgres DBaaS type
-	PostgresDBaaSType ObjectType = "postgres"
-	// SosType represents object storage storage type
-	SosType ObjectType = "object-storage-storage"
-)
-
-const provider = "exoscale"
-
-const (
-	querySos       = string(SosType) + ":" + provider
-	defaultUnitSos = "GBDay"
-
-	queryDBaaSPostgres = string(PostgresDBaaSType) + ":" + provider
-	defaultUnitDBaaS   = "Instances"
-)
-
-// exoscale service types to query billing Database types
-var (
-	billingTypes = map[string]string{
-		"pg": queryDBaaSPostgres,
-	}
-)
-
-var (
-	initConfigs = map[ObjectType]InitConfig{
-
-		// ObjectStorage specific objects for billing database
-		SosType: {
-			products: []db.Product{
-				{
-					Source: querySos,
-					Target: sql.NullString{String: "1402", Valid: true},
-					Amount: 0.000726,
-					Unit:   "GBDay",
-					During: db.InfiniteRange(),
-				},
-			},
-			discount: db.Discount{
-				Source:   string(SosType),
-				Discount: 0,
-				During:   db.InfiniteRange(),
-			},
-			query: db.Query{
-				Name:        querySos,
-				Description: "Object Storage - Storage (exoscale.com)",
-				Query:       "",
-				Unit:        "GBDay",
-				During:      db.InfiniteRange(),
-			},
-		},
-
-		// Postgres specific objects for billing database
-		PostgresDBaaSType: {
-			products: generatePostgresProducts(),
-			discount: db.Discount{
-				Source:   string(PostgresDBaaSType),
-				Discount: 0,
-				During:   db.InfiniteRange(),
-			},
-			query: db.Query{
-				Name:        queryDBaaSPostgres,
-				Description: "Database Service - PostgreSQL (exoscale.com)",
-				Query:       "",
-				Unit:        defaultUnitDBaaS,
-				During:      db.InfiniteRange(),
-			},
-		},
-	}
-)
+type ProductDBaaS struct {
+	Plan   string
+	Target string
+	Amount float64
+}
 
 // InitConfig is used to define and then save the initial configuration
 type InitConfig struct {

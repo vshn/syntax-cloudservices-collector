@@ -10,6 +10,26 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+const (
+	queryDBaaSPostgres   = string(PostgresDBaaSType) + ":" + provider
+	queryDBaaSMysql      = string(MysqlDBaaSType) + ":" + provider
+	queryDBaaSOpensearch = string(OpensearchDBaaSType) + ":" + provider
+	queryDBaaSRedis      = string(RedisDBaaSType) + ":" + provider
+	queryDBaaSKafka      = string(KafkaDBaaSType) + ":" + provider
+	defaultUnitDBaaS     = "Instances"
+)
+
+// exoscale service types to query billing Database types
+var (
+	billingTypes = map[string]string{
+		"pg":         queryDBaaSPostgres,
+		"mysql":      queryDBaaSMysql,
+		"opensearch": queryDBaaSOpensearch,
+		"redis":      queryDBaaSRedis,
+		"kafka":      queryDBaaSKafka,
+	}
+)
+
 // DBaaSDatabase contains the Database struct needed with the plan, specific of DBaaS
 type DBaaSDatabase struct {
 	Database
