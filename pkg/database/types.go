@@ -15,6 +15,8 @@ type ObjectType string
 const (
 	// PostgresDBaaSType represents postgres DBaaS type
 	PostgresDBaaSType ObjectType = "postgres"
+	// MysqlDBaaSType represents mysql DBaaS type
+	MysqlDBaaSType ObjectType = "mysql"
 	// SosType represents object storage storage type
 	SosType ObjectType = "object-storage-storage"
 )
@@ -26,13 +28,15 @@ const (
 	defaultUnitSos = "GBDay"
 
 	queryDBaaSPostgres = string(PostgresDBaaSType) + ":" + provider
+	queryDBaaSMysql    = string(MysqlDBaaSType) + ":" + provider
 	defaultUnitDBaaS   = "Instances"
 )
 
 // exoscale service types to query billing Database types
 var (
 	billingTypes = map[string]string{
-		"pg": queryDBaaSPostgres,
+		"pg":    queryDBaaSPostgres,
+		"mysql": queryDBaaSMysql,
 	}
 )
 
@@ -75,6 +79,23 @@ var (
 			query: db.Query{
 				Name:        queryDBaaSPostgres,
 				Description: "Database Service - PostgreSQL (exoscale.com)",
+				Query:       "",
+				Unit:        defaultUnitDBaaS,
+				During:      db.InfiniteRange(),
+			},
+		},
+
+		// Mysql specific objects for billing database
+		MysqlDBaaSType: {
+			products: generateMysqlProducts(),
+			discount: db.Discount{
+				Source:   string(MysqlDBaaSType),
+				Discount: 0,
+				During:   db.InfiniteRange(),
+			},
+			query: db.Query{
+				Name:        queryDBaaSMysql,
+				Description: "Database Service - MySQL (exoscale.com)",
 				Query:       "",
 				Unit:        defaultUnitDBaaS,
 				During:      db.InfiniteRange(),

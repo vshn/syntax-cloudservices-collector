@@ -25,6 +25,11 @@ var (
 			Version:  "v1",
 			Resource: "postgresqls",
 		},
+		"mysql": {
+			Group:    "exoscale.crossplane.io",
+			Version:  "v1",
+			Resource: "mysqls",
+		},
 	}
 )
 

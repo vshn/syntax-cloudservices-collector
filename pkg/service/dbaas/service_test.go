@@ -152,6 +152,14 @@ func TestDBaaS_filterSupportedServiceUsage(t *testing.T) {
 					Name: strToPointer("postgres-def"),
 					Type: strToPointer("pg"),
 				},
+				{
+					Name: strToPointer("mysql-abc"),
+					Type: strToPointer("mysql"),
+				},
+				{
+					Name: strToPointer("mysql-def"),
+					Type: strToPointer("mysql"),
+				},
 			},
 		},
 		"given Exoscale DBaasS, we should not get ExpectedExoscaleDBaasS": {
@@ -160,12 +168,12 @@ func TestDBaaS_filterSupportedServiceUsage(t *testing.T) {
 				dbaasDetails: []Detail{},
 				exoscaleDBaasS: []*egoscale.DatabaseService{
 					{
-						Name: strToPointer("mysql-abc"),
-						Type: strToPointer("mysql"),
+						Name: strToPointer("unknown-abc"),
+						Type: strToPointer("unknown"),
 					},
 					{
-						Name: strToPointer("mysql-def"),
-						Type: strToPointer("mysql"),
+						Name: strToPointer("kafka-def"),
+						Type: strToPointer("kafka"),
 					},
 					{
 						Name: strToPointer("redis-abc"),
