@@ -3,8 +3,11 @@ package sos
 import (
 	"context"
 	"fmt"
-	"github.com/exoscale/egoscale/v2/oapi"
 	"time"
+
+	"github.com/exoscale/egoscale/v2/oapi"
+	"github.com/vshn/exoscale-metrics-collector/pkg/database"
+	"github.com/vshn/exoscale-metrics-collector/pkg/service"
 
 	pipeline "github.com/ccremer/go-command-pipeline"
 	egoscale "github.com/exoscale/egoscale/v2"
@@ -14,21 +17,13 @@ import (
 	k8s "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	organizationLabel = "appuio.io/organization"
-	namespaceLabel    = "crossplane.io/claim-namespace"
-	// Exoscale gathers metrics of its bucket at 6AM UTC
-	exoscaleTimeZone    = "UTC"
-	exoscaleBillingHour = 6
-)
-
 // ObjectStorage gathers bucket data from exoscale provider and cluster and saves to the database
 type ObjectStorage struct {
 	k8sClient         k8s.Client
 	exoscaleClient    *egoscale.Client
-	database          *db.Database
+	database          *db.SosDatabase
 	bucketDetails     []BucketDetail
-	aggregatedBuckets map[string]db.AggregatedBucket
+	aggregatedBuckets map[db.Key]db.Aggregated
 }
 
 // BucketDetail a k8s bucket object with relevant data
@@ -36,12 +31,16 @@ type BucketDetail struct {
 	Organization, BucketName, Namespace string
 }
 
-//NewObjectStorage creates an ObjectStorage with the initial setup
+// NewObjectStorage creates an ObjectStorage with the initial setup
 func NewObjectStorage(exoscaleClient *egoscale.Client, k8sClient *k8s.Client, databaseURL string) ObjectStorage {
 	return ObjectStorage{
 		exoscaleClient: exoscaleClient,
 		k8sClient:      *k8sClient,
-		database:       &db.Database{URL: databaseURL},
+		database: &db.SosDatabase{
+			Database: db.Database{
+				URL: databaseURL,
+			},
+		},
 	}
 }
 
@@ -98,42 +97,30 @@ func (o *ObjectStorage) saveToDatabase(ctx context.Context) error {
 	log := ctrl.LoggerFrom(ctx)
 	log.Info("Creating a database connection")
 
-	log.V(1).Info("Opening database connection")
-	err := o.database.OpenConnection()
+	dctx := &database.Context{
+		Context:           ctx,
+		AggregatedObjects: &o.aggregatedBuckets,
+	}
+
+	err := o.database.Execute(dctx)
 	if err != nil {
-		return err
+		log.Error(err, "Cannot save to database")
 	}
-	defer o.database.CloseConnection()
-
-	log.V(1).Info("Ensuring initial database configuration")
-	err = o.database.EnsureInitConfiguration(ctx)
-	if err != nil {
-		return err
-	}
-
-	log.V(1).Info("Saving buckets information usage to database")
-	for namespace, aggregatedBucket := range o.aggregatedBuckets {
-		err = o.database.EnsureBucketUsage(ctx, namespace, aggregatedBucket)
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
 func (o *ObjectStorage) getBillingDate(_ context.Context) error {
-	location, err := time.LoadLocation(exoscaleTimeZone)
+	location, err := time.LoadLocation(service.ExoscaleTimeZone)
 	if err != nil {
 		return fmt.Errorf("cannot initialize location from time zone %s: %w", location, err)
 	}
 	now := time.Now().In(location)
 	previousDay := now.Day() - 1
-	o.database.BillingDate = time.Date(now.Year(), now.Month(), previousDay, exoscaleBillingHour, 0, 0, 0, now.Location())
+	o.database.BillingDate = time.Date(now.Year(), now.Month(), previousDay, service.ExoscaleBillingHour, 0, 0, 0, now.Location())
 	return nil
 }
 
-func getAggregatedBuckets(ctx context.Context, sosBucketsUsage []oapi.SosBucketUsage, bucketDetails []BucketDetail) map[string]db.AggregatedBucket {
+func getAggregatedBuckets(ctx context.Context, sosBucketsUsage []oapi.SosBucketUsage, bucketDetails []BucketDetail) map[db.Key]db.Aggregated {
 	log := ctrl.LoggerFrom(ctx)
 	log.Info("Aggregating buckets by namespace")
 
@@ -142,16 +129,18 @@ func getAggregatedBuckets(ctx context.Context, sosBucketsUsage []oapi.SosBucketU
 		sosBucketsUsageMap[*usage.Name] = usage
 	}
 
-	aggregatedBuckets := make(map[string]db.AggregatedBucket)
+	aggregatedBuckets := make(map[db.Key]db.Aggregated)
 	for _, bucketDetail := range bucketDetails {
 		log.V(1).Info("Checking bucket", "bucket", bucketDetail.BucketName)
 
 		if bucketUsage, exists := sosBucketsUsageMap[bucketDetail.BucketName]; exists {
 			log.V(1).Info("Found exoscale bucket usage", "bucket", bucketUsage.Name, "bucket size", bucketUsage.Name)
-			aggregatedBucket := aggregatedBuckets[bucketDetail.Namespace]
+			key := db.NewKey(bucketDetail.Namespace)
+			aggregatedBucket := aggregatedBuckets[key]
+			aggregatedBucket.Key = key
 			aggregatedBucket.Organization = bucketDetail.Organization
-			aggregatedBucket.StorageUsed += float64(*bucketUsage.Size)
-			aggregatedBuckets[bucketDetail.Namespace] = aggregatedBucket
+			aggregatedBucket.Value += float64(*bucketUsage.Size)
+			aggregatedBuckets[key] = aggregatedBucket
 		} else {
 			log.Info("Could not find any bucket on exoscale", "bucket", bucketDetail.BucketName)
 		}
@@ -161,28 +150,28 @@ func getAggregatedBuckets(ctx context.Context, sosBucketsUsage []oapi.SosBucketU
 
 func addOrgAndNamespaceToBucket(ctx context.Context, buckets exoscalev1.BucketList) []BucketDetail {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Gathering more information from buckets")
+	log.V(1).Info("Gathering org and namespace from buckets")
 
 	bucketDetails := make([]BucketDetail, 0, 10)
 	for _, bucket := range buckets.Items {
 		bucketDetail := BucketDetail{
 			BucketName: bucket.Spec.ForProvider.BucketName,
 		}
-		if organization, exist := bucket.ObjectMeta.Labels[organizationLabel]; exist {
+		if organization, exist := bucket.ObjectMeta.Labels[service.OrganizationLabel]; exist {
 			bucketDetail.Organization = organization
 		} else {
 			// cannot get organization from bucket
 			log.Info("Organization label is missing in bucket, skipping...",
-				"label", organizationLabel,
+				"label", service.OrganizationLabel,
 				"bucket", bucket.Name)
 			continue
 		}
-		if namespace, exist := bucket.ObjectMeta.Labels[namespaceLabel]; exist {
+		if namespace, exist := bucket.ObjectMeta.Labels[service.NamespaceLabel]; exist {
 			bucketDetail.Namespace = namespace
 		} else {
 			// cannot get namespace from bucket
 			log.Info("Namespace label is missing in bucket, skipping...",
-				"label", namespaceLabel,
+				"label", service.NamespaceLabel,
 				"bucket", bucket.Name)
 			continue
 		}

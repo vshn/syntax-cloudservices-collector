@@ -4,13 +4,17 @@
 
 This component requires https://github.com/appuio/component-appuio-cloud-reporting[component-appuio-cloud-reporting] and is installed into the same namespace.
 This is required for this component to be able to access the billing database and its connection secrets.
-It also requires an Exoscale IAMKey and a Kubernetes/OpenShift Service Account token in the target cluster to get `buckets.exoscale.crossplane.io` resources.
+It also requires an Exoscale IAMKey and a Kubernetes/OpenShift Service Account token in the target cluster to get resources (e.g. SOS buckets, Postgres, etc).
 
 == Sources
 
 The data is matched from k8s cluster and Exoscale organization.
-The Kubernetes Service Account token is required to have `get` permissions on `Namespaces` and `buckets.exoscale.crossplane.io` resources.
-The Access Key (IAM Key) from an Exoscale organization is required to have read access across all SOS buckets.
+The Kubernetes Service Account token is required to have `get` permissions on `Namespaces` and to the following managed resources:
+
+* `buckets.exoscale.crossplane.io`
+* `postgresqls.exoscale.crossplane.io`
+
+The Access Key (IAM Key) from an Exoscale organization is required to have read access across all managed resources (e.g. SOS buckets, Postgres, etc).
 
 == Example
 

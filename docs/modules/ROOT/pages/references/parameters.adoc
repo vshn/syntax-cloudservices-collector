@@ -15,7 +15,7 @@ See xref:how-tos/installation.adoc[Installation] for a full example.
 
 [horizontal]
 type:: dictionary
-default:: https://github.com/vshn/exoscale-metrics-collector/blob/master/component/class/defaults.yml[See `class/defaults.yml].
+default:: https://github.com/vshn/exoscale-metrics-collector/blob/master/component/class/defaults.yml[See class/defaults.yml].
 
 Dictionary containing the container images used by this component.
 
@@ -65,4 +65,15 @@ default:: Required.
 
 The token to connect to a Kubernetes cluster.
 
-The Service Account connected to this token should have `get` and `list` permissions to `buckets.exoscale.crossplane.io` managed resource.
+The Service Account connected to this token should have `get` and `list` permissions to the following managed resources:
+
+* `buckets.exoscale.crossplane.io`
+* `postgresqls.exoscale.crossplane.io`
+
+== `secrets.credentials.stringData.ACR_DB_URL`
+
+[horizontal]
+type:: string
+default:: Required.
+
+The Billing Database URL.

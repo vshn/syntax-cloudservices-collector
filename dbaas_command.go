@@ -4,23 +4,23 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/vshn/exoscale-metrics-collector/pkg/clients/cluster"
 	"github.com/vshn/exoscale-metrics-collector/pkg/clients/exoscale"
-	"github.com/vshn/exoscale-metrics-collector/pkg/service/sos"
+	"github.com/vshn/exoscale-metrics-collector/pkg/service/dbaas"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 const (
-	objectStorageName = "objectstorage"
+	dbaasName = "dbaas"
 )
 
-type objectStorageCommand struct {
+type dbaasCommand struct {
 	command
 }
 
-func newObjectStorageCommand() *cli.Command {
-	command := &objectStorageCommand{}
+func newDBaasSCommand() *cli.Command {
+	command := &dbaasCommand{}
 	return &cli.Command{
-		Name:   objectStorageName,
-		Usage:  "Get metrics from object storage service",
+		Name:   dbaasName,
+		Usage:  "Get metrics from database service",
 		Action: command.execute,
 		Flags: []cli.Flag{
 			getClusterURLFlag(&command.clusterURL),
@@ -32,8 +32,8 @@ func newObjectStorageCommand() *cli.Command {
 	}
 }
 
-func (c *objectStorageCommand) execute(ctx *cli.Context) error {
-	log := AppLogger(ctx).WithName(objectStorageName)
+func (c *dbaasCommand) execute(ctx *cli.Context) error {
+	log := AppLogger(ctx).WithName(dbaasName)
 	ctrl.SetLogger(log)
 
 	log.Info("Creating Exoscale client")
@@ -43,11 +43,11 @@ func (c *objectStorageCommand) execute(ctx *cli.Context) error {
 	}
 
 	log.Info("Creating k8s client")
-	k8sClient, err := cluster.InitK8sClient(c.clusterURL, c.clusterToken)
+	k8sClient, err := cluster.InitK8sClientDynamic(c.clusterURL, c.clusterToken)
 	if err != nil {
 		return err
 	}
 
-	o := sos.NewObjectStorage(exoscaleClient, k8sClient, c.databaseURL)
-	return o.Execute(ctx.Context)
+	d := dbaas.NewDBaaSService(exoscaleClient, k8sClient, c.databaseURL)
+	return d.Execute(ctx.Context)
 }
