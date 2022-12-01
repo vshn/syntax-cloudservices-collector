@@ -13,8 +13,6 @@ type productDBaaS struct {
 }
 
 var (
-	// Hobbyist1 plan
-	Hobbyist1 = productDBaaS{Plan: "hobbyist-1", Target: "1411", Amount: 0.06148}
 	// Hobbyist2 plan
 	Hobbyist2 = productDBaaS{Plan: "hobbyist-2", Target: "1411", Amount: 0.06683}
 	// Startup4 plan
