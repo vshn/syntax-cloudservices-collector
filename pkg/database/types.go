@@ -17,6 +17,8 @@ const (
 	PostgresDBaaSType ObjectType = "postgres"
 	// MysqlDBaaSType represents mysql DBaaS type
 	MysqlDBaaSType ObjectType = "mysql"
+	// OpensearchDBaaSType represents mysql DBaaS type
+	OpensearchDBaaSType ObjectType = "opensearch"
 	// SosType represents object storage storage type
 	SosType ObjectType = "object-storage-storage"
 )
@@ -27,9 +29,10 @@ const (
 	querySos       = string(SosType) + ":" + provider
 	defaultUnitSos = "GBDay"
 
-	queryDBaaSPostgres = string(PostgresDBaaSType) + ":" + provider
-	queryDBaaSMysql    = string(MysqlDBaaSType) + ":" + provider
-	defaultUnitDBaaS   = "Instances"
+	queryDBaaSPostgres   = string(PostgresDBaaSType) + ":" + provider
+	queryDBaaSMysql      = string(MysqlDBaaSType) + ":" + provider
+	queryDBaaSOpensearch = string(OpensearchDBaaSType) + ":" + provider
+	defaultUnitDBaaS     = "Instances"
 )
 
 // exoscale service types to query billing Database types
@@ -96,6 +99,23 @@ var (
 			query: db.Query{
 				Name:        queryDBaaSMysql,
 				Description: "Database Service - MySQL (exoscale.com)",
+				Query:       "",
+				Unit:        defaultUnitDBaaS,
+				During:      db.InfiniteRange(),
+			},
+		},
+
+		// Opensearch specific objects for billing database
+		OpensearchDBaaSType: {
+			products: generateOpensearchProducts(),
+			discount: db.Discount{
+				Source:   string(OpensearchDBaaSType),
+				Discount: 0,
+				During:   db.InfiniteRange(),
+			},
+			query: db.Query{
+				Name:        queryDBaaSOpensearch,
+				Description: "Database Service - Opensearch (exoscale.com)",
 				Query:       "",
 				Unit:        defaultUnitDBaaS,
 				During:      db.InfiniteRange(),

@@ -30,6 +30,11 @@ var (
 			Version:  "v1",
 			Resource: "mysqls",
 		},
+		"opensearch": {
+			Group:    "exoscale.crossplane.io",
+			Version:  "v1",
+			Resource: "opensearches",
+		},
 	}
 )
 
@@ -94,6 +99,10 @@ func (s *Service) fetchManagedDBaaS(ctx *Context) error {
 	for _, groupVersionResource := range groupVersionResources {
 		managedResources, err := s.k8sClient.Resource(groupVersionResource).List(ctx, metav1.ListOptions{})
 		if err != nil {
+			// fixme
+			if err.Error() == "the server could not find the requested resource" {
+				continue
+			}
 			return fmt.Errorf("cannot list managed resource %s from cluster: %w", groupVersionResource.Resource, err)
 		}
 
