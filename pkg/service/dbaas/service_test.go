@@ -13,8 +13,8 @@ import (
 func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 	ctx := context.Background()
 
-	key1 := db.NewKey("vshn-xyz", db.Hobbyist2.Plan, string(db.PostgresDBaaSType))
-	key2 := db.NewKey("vshn-abc", db.Business128.Plan, string(db.PostgresDBaaSType))
+	key1 := db.NewKey("vshn-xyz", "hobbyist-2", string(db.PostgresDBaaSType))
+	key2 := db.NewKey("vshn-abc", "business-128", string(db.PostgresDBaaSType))
 
 	expectedAggregatedDBaaS := map[db.Key]db.Aggregated{
 		key1: {
@@ -54,12 +54,12 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 					{
 						Name: strToPointer("postgres-abc"),
 						Type: strToPointer(string(db.PostgresDBaaSType)),
-						Plan: strToPointer(db.Hobbyist2.Plan),
+						Plan: strToPointer("hobbyist-2"),
 					},
 					{
 						Name: strToPointer("postgres-def"),
 						Type: strToPointer(string(db.PostgresDBaaSType)),
-						Plan: strToPointer(db.Business128.Plan),
+						Plan: strToPointer("business-128"),
 					},
 				},
 				aggregatedDBaasS: map[db.Key]db.Aggregated{},
@@ -104,85 +104,6 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 			err := aggregateDBaaS(&tc.ctx)
 			assert.NoError(t, err)
 			assert.True(t, reflect.DeepEqual(tc.expectedAggregatedDBaaS, tc.ctx.aggregatedDBaasS))
-		})
-	}
-}
-
-func TestDBaaS_filterSupportedServiceUsage(t *testing.T) {
-	ctx := context.Background()
-
-	tests := map[string]struct {
-		ctx                    Context
-		expectedExoscaleDBaasS []*egoscale.DatabaseService
-	}{
-		"given Exoscale DBaasS, we should get filtered by type ExpectedExoscaleDBaasS": {
-			ctx: Context{
-				Context:      ctx,
-				dbaasDetails: []Detail{},
-				exoscaleDBaasS: []*egoscale.DatabaseService{
-					{
-						Name: strToPointer("postgres-abc"),
-						Type: strToPointer("pg"),
-					},
-					{
-						Name: strToPointer("postgres-def"),
-						Type: strToPointer("pg"),
-					},
-					{
-						Name: strToPointer("mysql-abc"),
-						Type: strToPointer("mysql"),
-					},
-					{
-						Name: strToPointer("mysql-def"),
-						Type: strToPointer("mysql"),
-					},
-					{
-						Name: strToPointer("redis-abc"),
-						Type: strToPointer("redis"),
-					},
-				},
-				aggregatedDBaasS: map[db.Key]db.Aggregated{},
-			},
-			expectedExoscaleDBaasS: []*egoscale.DatabaseService{
-				{
-					Name: strToPointer("postgres-abc"),
-					Type: strToPointer("pg"),
-				},
-				{
-					Name: strToPointer("postgres-def"),
-					Type: strToPointer("pg"),
-				},
-			},
-		},
-		"given Exoscale DBaasS, we should not get ExpectedExoscaleDBaasS": {
-			ctx: Context{
-				Context:      ctx,
-				dbaasDetails: []Detail{},
-				exoscaleDBaasS: []*egoscale.DatabaseService{
-					{
-						Name: strToPointer("mysql-abc"),
-						Type: strToPointer("mysql"),
-					},
-					{
-						Name: strToPointer("mysql-def"),
-						Type: strToPointer("mysql"),
-					},
-					{
-						Name: strToPointer("redis-abc"),
-						Type: strToPointer("redis"),
-					},
-				},
-				aggregatedDBaasS: map[db.Key]db.Aggregated{},
-			},
-			expectedExoscaleDBaasS: []*egoscale.DatabaseService{},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			err := filterSupportedServiceUsage(&tc.ctx)
-			assert.NoError(t, err)
-			assert.ElementsMatch(t, tc.expectedExoscaleDBaasS, tc.ctx.exoscaleDBaasS)
 		})
 	}
 }

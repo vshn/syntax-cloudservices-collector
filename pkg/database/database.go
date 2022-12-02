@@ -18,7 +18,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// Context contains necessary data that will be save in database
+// Context contains necessary data that will be saved in database
 type Context struct {
 	context.Context
 	Aggregated        *Aggregated

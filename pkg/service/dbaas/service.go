@@ -3,6 +3,7 @@ package dbaas
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"time"
 
 	pipeline "github.com/ccremer/go-command-pipeline"
@@ -24,6 +25,26 @@ var (
 			Group:    "exoscale.crossplane.io",
 			Version:  "v1",
 			Resource: "postgresqls",
+		},
+		"mysql": {
+			Group:    "exoscale.crossplane.io",
+			Version:  "v1",
+			Resource: "mysqls",
+		},
+		"opensearch": {
+			Group:    "exoscale.crossplane.io",
+			Version:  "v1",
+			Resource: "opensearches",
+		},
+		"redis": {
+			Group:    "exoscale.crossplane.io",
+			Version:  "v1",
+			Resource: "redis",
+		},
+		"kafka": {
+			Group:    "exoscale.crossplane.io",
+			Version:  "v1",
+			Resource: "kafkas",
 		},
 	}
 )
@@ -70,7 +91,6 @@ func (s *Service) Execute(ctx context.Context) error {
 	p.WithSteps(
 		p.NewStep("Fetch cluster managed DBaaS", s.fetchManagedDBaaS),
 		p.NewStep("Fetch exoscale DBaaS usage", s.fetchDBaaSUsage),
-		p.NewStep("Filter supported DBaaS", filterSupportedServiceUsage),
 		p.NewStep("Aggregate DBaaS services by namespace and plan", aggregateDBaaS),
 		p.WithNestedSteps("Save to billing database", hasAggregatedInstances,
 			p.NewStep("Get billing date", s.getBillingDate),
@@ -89,6 +109,9 @@ func (s *Service) fetchManagedDBaaS(ctx *Context) error {
 	for _, groupVersionResource := range groupVersionResources {
 		managedResources, err := s.k8sClient.Resource(groupVersionResource).List(ctx, metav1.ListOptions{})
 		if err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
 			return fmt.Errorf("cannot list managed resource %s from cluster: %w", groupVersionResource.Resource, err)
 		}
 
@@ -142,22 +165,6 @@ func (s *Service) fetchDBaaSUsage(ctx *Context) error {
 		databaseServices = append(databaseServices, databaseServicesByZone...)
 	}
 	ctx.exoscaleDBaasS = databaseServices
-	return nil
-}
-
-// filterSupportedServiceUsage filters exoscale dbaas service by supported DBaaS groupVersionResources
-func filterSupportedServiceUsage(ctx *Context) error {
-	log := ctrl.LoggerFrom(ctx)
-	log.Info("Filtering by dbaas type")
-
-	var exoscaleDBaasS []*egoscale.DatabaseService
-	for _, exoscaleService := range ctx.exoscaleDBaasS {
-		if _, ok := groupVersionResources[*exoscaleService.Type]; ok {
-			exoscaleDBaasS = append(exoscaleDBaasS, exoscaleService)
-		}
-	}
-
-	ctx.exoscaleDBaasS = exoscaleDBaasS
 	return nil
 }
 
