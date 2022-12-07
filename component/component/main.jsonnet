@@ -28,6 +28,82 @@ local secrets = [
   for s in std.objectFields(params.secrets)
 ];
 
+local cronjob(name, subcommand, schedule) = {
+  kind: 'CronJob',
+  apiVersion: 'batch/v1',
+  metadata: {
+    name: name,
+    namespace: paramsACR.namespace,
+    labels+: labels,
+  },
+  spec: {
+    concurrencyPolicy: 'Forbid',
+    failedJobsHistoryLimit: 5,
+    jobTemplate: {
+      spec: {
+        template: {
+          spec: {
+            restartPolicy: 'OnFailure',
+            containers: [
+              {
+                name: 'exoscale-metrics-collector-backfill',
+                image: collectorImage,
+                args: [
+                  subcommand,
+                ],
+                envFrom: [
+                  {
+                    secretRef: {
+                      name: credentials_secret_name,
+                    },
+                  },
+                ],
+                env: [
+                  {
+                    name: 'password',
+                    valueFrom: {
+                      secretKeyRef: {
+                        key: 'password',
+                        name: 'reporting-db',
+                      },
+                    },
+                  },
+                  {
+                    name: 'username',
+                    valueFrom: {
+                      secretKeyRef: {
+                        key: 'username',
+                        name: 'reporting-db',
+                      },
+                    },
+                  },
+                  {
+                    name: 'ACR_DB_URL',
+                    value: 'postgres://$(username):$(password)@%(host)s:%(port)s/%(name)s?%(parameters)s' % paramsACR.database,
+                  },
+                ],
+                resources: {},
+              },
+            ],
+          },
+        },
+      },
+    },
+    schedule: schedule,
+    successfulJobsHistoryLimit: 3,
+  },
+};
+
+local objectStorageSchedule =
+  if std.objectHas(params, 'schedule') then
+    std.trace(
+      'Parameter `schedule` is deprecated,'
+      + ' please use parameter `objectStorage.schedule` instead',
+      params.schedule
+    )
+  else
+    params.objectStorage.schedule;
+
 {
   assert params.secrets != null : 'secrets must be set.',
   assert params.secrets.credentials != null : 'secrets.credentials must be set.',
@@ -39,69 +115,6 @@ local secrets = [
 
   secrets: std.filter(function(it) it != null, secrets),
 
-  cronjob: {
-    kind: 'CronJob',
-    apiVersion: 'batch/v1',
-    metadata: {
-      name: alias,
-      namespace: paramsACR.namespace,
-      labels+: labels,
-    },
-    spec: {
-      concurrencyPolicy: 'Forbid',
-      failedJobsHistoryLimit: 5,
-      jobTemplate: {
-        spec: {
-          template: {
-            spec: {
-              restartPolicy: 'OnFailure',
-              containers: [
-                {
-                  name: 'exoscale-metrics-collector-backfill',
-                  image: collectorImage,
-                  args: [
-                    'objectstorage',
-                  ],
-                  envFrom: [
-                    {
-                      secretRef: {
-                        name: credentials_secret_name
-                      }
-                    }
-                  ],
-                  env: [
-                    {
-                      name: 'password',
-                      valueFrom: {
-                        secretKeyRef: {
-                          key: 'password',
-                          name: 'reporting-db',
-                        },
-                      },
-                    },
-                    {
-                      name: 'username',
-                      valueFrom: {
-                        secretKeyRef: {
-                          key: 'username',
-                          name: 'reporting-db',
-                        },
-                      },
-                    },
-                    {
-                      name: 'ACR_DB_URL',
-                      value: 'postgres://$(username):$(password)@%(host)s:%(port)s/%(name)s?%(parameters)s' % paramsACR.database,
-                    },
-                  ],
-                  resources: {},
-                },
-              ],
-            },
-          },
-        },
-      },
-      schedule: params.schedule,
-      successfulJobsHistoryLimit: 3,
-    },
-  },
+  objectStorageCronjob: cronjob(alias + '-objectstorage', 'objectstorage', objectStorageSchedule),
+  [if params.dbaas.enabled then 'dbaasCronjob']: cronjob(alias + '-dbaas', 'dbaas', params.dbaas.schedule),
 }

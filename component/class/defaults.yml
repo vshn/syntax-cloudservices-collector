@@ -15,5 +15,14 @@ parameters:
         repository: 'vshn/exoscale-metrics-collector'
         tag: 'v0.3.0'
     # Times in UTC! Don't run job around midnight as exoscale API may return incomplete data
-    # default: Every day at minute 10 past hour 10, 16 and 20.
-    schedule: '10 10,16,20 * * *'
+
+    objectStorage:
+      # schedule for objectstorage cronjob
+      # default: Every day at minute 10 past hour 10, 16 and 20.
+      schedule: '10 10,16,20 * * *'
+
+    dbaas:
+      # enable DBaaS cronjob in addition to objectstorage cronjob.
+      enabled: false
+      # schedule for DBaaS cronjob every 15min
+      schedule: '*/15 * * * *'

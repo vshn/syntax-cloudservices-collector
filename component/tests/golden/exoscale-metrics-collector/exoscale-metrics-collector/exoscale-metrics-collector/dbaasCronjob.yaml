@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/managed-by: commodore
     app.kubernetes.io/name: exoscale-metrics-collector
     app.kubernetes.io/part-of: appuio-cloud-reporting
-  name: exoscale-metrics-collector
+  name: exoscale-metrics-collector-dbaas
   namespace: appuio-cloud-reporting
 spec:
   concurrencyPolicy: Forbid
@@ -17,7 +17,7 @@ spec:
         spec:
           containers:
             - args:
-                - objectstorage
+                - dbaas
               env:
                 - name: password
                   valueFrom:
@@ -38,5 +38,5 @@ spec:
               name: exoscale-metrics-collector-backfill
               resources: {}
           restartPolicy: OnFailure
-  schedule: 10 10,16,20 * * *
+  schedule: '*/15 * * * *'
   successfulJobsHistoryLimit: 3

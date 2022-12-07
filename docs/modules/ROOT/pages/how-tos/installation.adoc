@@ -13,6 +13,9 @@ The Kubernetes Service Account token is required to have `get` permissions on `N
 
 * `buckets.exoscale.crossplane.io`
 * `postgresqls.exoscale.crossplane.io`
+* `mysqls.exoscale.crossplane.io`
+* `redis.exoscale.crossplane.io`
+* `kafkas.exoscale.crossplane.io`
 
 The Access Key (IAM Key) from an Exoscale organization is required to have read access across all managed resources (e.g. SOS buckets, Postgres, etc).
 
@@ -25,7 +28,11 @@ applications:
 
 parameters:
   exoscale_metrics_collector:
-    schedule: '10 10,16,20 * * *'
+    objectStorage:
+      schedule: '10 10,16,20 * * *'
+    dbaas:
+      enabled: true # must be manually enabled to scrape DBaas metrics
+      schedule: '*/15 * * * *'
 ----
 
 See the xref:references/parameters.adoc[parameters] reference for a full list of parameters.

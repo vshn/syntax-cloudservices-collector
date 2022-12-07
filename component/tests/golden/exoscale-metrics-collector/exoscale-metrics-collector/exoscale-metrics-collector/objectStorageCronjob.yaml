@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/managed-by: commodore
     app.kubernetes.io/name: exoscale-metrics-collector
     app.kubernetes.io/part-of: appuio-cloud-reporting
-  name: collector-cloudscale-lpg-2
+  name: exoscale-metrics-collector-objectstorage
   namespace: appuio-cloud-reporting
 spec:
   concurrencyPolicy: Forbid
@@ -33,7 +33,7 @@ spec:
                   value: postgres://$(username):$(password)@reporting-db.appuio-reporting.svc:5432/reporting?sslmode=disable
               envFrom:
                 - secretRef:
-                    name: credentials-collector-cloudscale-lpg-2
+                    name: credentials-exoscale-metrics-collector
               image: ghcr.io/vshn/exoscale-metrics-collector:v0.3.0
               name: exoscale-metrics-collector-backfill
               resources: {}

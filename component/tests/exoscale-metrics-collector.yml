@@ -7,3 +7,6 @@ parameters:
       parameters: 'sslmode=disable'
       password: 'passw0rd'
       port: 5432
+  exoscale_metrics_collector:
+    dbaas:
+      enabled: true
