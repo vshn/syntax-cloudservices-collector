@@ -108,9 +108,10 @@ func TestObjectStorage_GetAggregated(t *testing.T) {
 	}
 }
 
-func TestObjectStorage_AadOrgAndNamespaceToBucket(t *testing.T) {
+func TestObjectStorage_addOrgAndNamespaceToBucket(t *testing.T) {
 	tests := map[string]struct {
 		givenBucketList       exoscalev1.BucketList
+		givenNamespaces       map[string]string
 		expectedBucketDetails []BucketDetail
 	}{
 		"GivenBucketListFromExoscale_WhenOrgAndNamespaces_ThenExpectBucketDetailObjects": {
@@ -122,6 +123,12 @@ func TestObjectStorage_AadOrgAndNamespaceToBucket(t *testing.T) {
 					createBucket("bucket-4", "omega", "orgB"),
 					createBucket("bucket-5", "theta", "orgC"),
 				},
+			},
+			givenNamespaces: map[string]string{
+				"alpha": "orgA",
+				"beta":  "orgB",
+				"omega": "orgB",
+				"theta": "orgC",
 			},
 			expectedBucketDetails: []BucketDetail{
 				createBucketDetail("bucket-1", "alpha", "orgA"),
@@ -139,6 +146,7 @@ func TestObjectStorage_AadOrgAndNamespaceToBucket(t *testing.T) {
 					createBucket("bucket-3", "", ""),
 				},
 			},
+			givenNamespaces:       map[string]string{},
 			expectedBucketDetails: []BucketDetail{},
 		},
 	}
@@ -148,10 +156,10 @@ func TestObjectStorage_AadOrgAndNamespaceToBucket(t *testing.T) {
 			ctx := context.Background()
 
 			// When
-			bucketDetails := addOrgAndNamespaceToBucket(ctx, tc.givenBucketList)
+			bucketDetails := addOrgAndNamespaceToBucket(ctx, tc.givenBucketList, tc.givenNamespaces)
 
 			// Then
-			assert.Equal(t, tc.expectedBucketDetails, bucketDetails)
+			assert.ElementsMatch(t, tc.expectedBucketDetails, bucketDetails)
 		})
 	}
 }
