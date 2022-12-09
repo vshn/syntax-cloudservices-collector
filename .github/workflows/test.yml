@@ -1,15 +1,10 @@
 name: Test
 
 on:
-  pull_request:
-    branches:
-      - master
+  pull_request: {}
   push:
     branches:
       - master
-
-env:
-  COMPONENT_NAME: exoscale-metrics-collector
 
 jobs:
   test:
@@ -31,8 +26,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - name: Ensure go modules are installed
+        run: go mod download
+
       - name: Run tests
-        run: make test
+        run: make test-integration
 
   golden:
     runs-on: ubuntu-latest
