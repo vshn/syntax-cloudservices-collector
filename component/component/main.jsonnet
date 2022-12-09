@@ -115,6 +115,6 @@ local objectStorageSchedule =
 
   secrets: std.filter(function(it) it != null, secrets),
 
-  objectStorageCronjob: cronjob(alias + '-objectstorage', 'objectstorage', objectStorageSchedule),
-  [if params.dbaas.enabled then 'dbaasCronjob']: cronjob(alias + '-dbaas', 'dbaas', params.dbaas.schedule),
+  objectStorageCronjob: cronjob(alias + '-objectstorage', 'exoscale objectstorage', objectStorageSchedule),
+  [if params.dbaas.enabled then 'dbaasCronjob']: cronjob(alias + '-dbaas', 'exoscale dbaas', params.dbaas.schedule),
 }

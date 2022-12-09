@@ -17,7 +17,7 @@ spec:
         spec:
           containers:
             - args:
-                - dbaas
+                - exoscale dbaas
               env:
                 - name: password
                   valueFrom:
