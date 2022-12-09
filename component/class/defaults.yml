@@ -13,7 +13,7 @@ parameters:
       collector:
         registry: 'ghcr.io'
         repository: 'vshn/exoscale-metrics-collector'
-        tag: 'v0.3.0'
+        tag: 'v0.4.0'
     # Times in UTC! Don't run job around midnight as exoscale API may return incomplete data
 
     objectStorage:
