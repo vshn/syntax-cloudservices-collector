@@ -3,13 +3,16 @@ package dbaas
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+
 	pipeline "github.com/ccremer/go-command-pipeline"
+	"github.com/go-logr/logr"
 	"github.com/vshn/exoscale-metrics-collector/pkg/clients/exoscale"
 	"github.com/vshn/exoscale-metrics-collector/pkg/database"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 
@@ -89,7 +92,7 @@ func (s *Service) Execute(ctx context.Context) error {
 
 	p := pipeline.NewPipeline[*Context]()
 	p.WithSteps(
-		p.NewStep("Fetch cluster managed DBaaS", s.fetchManagedDBaaS),
+		p.NewStep("Fetch cluster managed DBaaS and namespaces", s.fetchManagedDBaaSAndNamespaces),
 		p.NewStep("Fetch exoscale DBaaS usage", s.fetchDBaaSUsage),
 		p.NewStep("Aggregate DBaaS services by namespace and plan", aggregateDBaaS),
 		p.WithNestedSteps("Save to billing database", hasAggregatedInstances,
@@ -101,9 +104,15 @@ func (s *Service) Execute(ctx context.Context) error {
 	return p.RunWithContext(&Context{Context: ctx})
 }
 
-// fetchManagedDBaaS fetches instances from kubernetes cluster
-func (s *Service) fetchManagedDBaaS(ctx *Context) error {
+// fetchManagedDBaaSAndNamespaces fetches instances and namespaces from kubernetes cluster
+func (s *Service) fetchManagedDBaaSAndNamespaces(ctx *Context) error {
 	log := ctrl.LoggerFrom(ctx)
+
+	log.V(1).Info("Listing namespaces from cluster")
+	namespaces, err := fetchNamespaceWithOrganizationMap(ctx, s.k8sClient)
+	if err != nil {
+		return fmt.Errorf("cannot list namespaces: %w", err)
+	}
 
 	var dbaasDetails []Detail
 	for _, groupVersionResource := range groupVersionResources {
@@ -116,38 +125,46 @@ func (s *Service) fetchManagedDBaaS(ctx *Context) error {
 		}
 
 		for _, managedResource := range managedResources.Items {
-			dbaasDetail := Detail{
-				DBName: managedResource.GetName(),
-				Type:   groupVersionResource.Resource,
-			}
-			if organization, exist := managedResource.GetLabels()[service.OrganizationLabel]; exist {
-				dbaasDetail.Organization = organization
-			} else {
-				// cannot get organization from DBaaS
-				log.Info("Organization label is missing in DBaaS service, skipping...",
-					"label", service.OrganizationLabel,
-					"dbaas", managedResource.GetName())
+			dbaasDetail := findDBaaSDetailInNamespacesMap(managedResource, groupVersionResource, namespaces, log)
+			if dbaasDetail == nil {
 				continue
 			}
-			if namespace, exist := managedResource.GetLabels()[service.NamespaceLabel]; exist {
-				dbaasDetail.Namespace = namespace
-			} else {
-				// cannot get namespace from DBaaS
-				log.Info("Namespace label is missing in DBaaS, skipping...",
-					"label", service.NamespaceLabel,
-					"dbaas", managedResource.GetName())
-				continue
-			}
-			log.V(1).Info("Added namespace and organization to DBaaS",
-				"dbaas", managedResource.GetName(),
-				"namespace", dbaasDetail.Namespace,
-				"organization", dbaasDetail.Organization)
-			dbaasDetails = append(dbaasDetails, dbaasDetail)
+			dbaasDetails = append(dbaasDetails, *dbaasDetail)
 		}
 	}
 
 	ctx.dbaasDetails = dbaasDetails
 	return nil
+}
+
+func findDBaaSDetailInNamespacesMap(managedResource unstructured.Unstructured, groupVersionResource schema.GroupVersionResource, namespaces map[string]string, log logr.Logger) *Detail {
+	dbaasDetail := Detail{
+		DBName: managedResource.GetName(),
+		Type:   groupVersionResource.Resource,
+	}
+	if namespace, exist := managedResource.GetLabels()[service.NamespaceLabel]; exist {
+		organization, ok := namespaces[namespace]
+		if !ok {
+			// cannot find namespace in namespace list
+			log.Info("Namespace not found in namespace list, skipping...",
+				"namespace", namespace,
+				"dbaas", managedResource.GetName())
+			return nil
+		}
+		dbaasDetail.Namespace = namespace
+		dbaasDetail.Organization = organization
+	} else {
+		// cannot get namespace from DBaaS
+		log.Info("Namespace label is missing in DBaaS, skipping...",
+			"label", service.NamespaceLabel,
+			"dbaas", managedResource.GetName())
+		return nil
+	}
+	log.V(1).Info("Added namespace and organization to DBaaS",
+		"dbaas", managedResource.GetName(),
+		"namespace", dbaasDetail.Namespace,
+		"organization", dbaasDetail.Organization)
+	return &dbaasDetail
 }
 
 // fetchDBaaSUsage gets DBaaS service usage from Exoscale
@@ -236,4 +253,28 @@ func hasAggregatedInstances(ctx *Context) bool {
 		return false
 	}
 	return true
+}
+
+func fetchNamespaceWithOrganizationMap(ctx context.Context, k8sClient dynamic.Interface) (map[string]string, error) {
+	log := ctrl.LoggerFrom(ctx)
+	nsGroupVersionResource := schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "namespaces",
+	}
+	list, err := k8sClient.Resource(nsGroupVersionResource).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("cannot get namespace list: %w", err)
+	}
+
+	namespaces := map[string]string{}
+	for _, ns := range list.Items {
+		org, ok := ns.GetLabels()[service.OrganizationLabel]
+		if !ok {
+			log.Info("Organization label not found in namespace", "namespace", ns.GetName())
+			continue
+		}
+		namespaces[ns.GetName()] = org
+	}
+	return namespaces, nil
 }
