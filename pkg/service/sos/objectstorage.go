@@ -13,7 +13,9 @@ import (
 	egoscale "github.com/exoscale/egoscale/v2"
 	db "github.com/vshn/exoscale-metrics-collector/pkg/database"
 	exoscalev1 "github.com/vshn/provider-exoscale/apis/exoscale/v1"
+	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8s "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -32,10 +34,10 @@ type BucketDetail struct {
 }
 
 // NewObjectStorage creates an ObjectStorage with the initial setup
-func NewObjectStorage(exoscaleClient *egoscale.Client, k8sClient *k8s.Client, databaseURL string) ObjectStorage {
+func NewObjectStorage(exoscaleClient *egoscale.Client, k8sClient k8s.Client, databaseURL string) ObjectStorage {
 	return ObjectStorage{
 		exoscaleClient: exoscaleClient,
-		k8sClient:      *k8sClient,
+		k8sClient:      k8sClient,
 		database: &db.SosDatabase{
 			Database: db.Database{
 				URL: databaseURL,
@@ -51,7 +53,7 @@ func (o *ObjectStorage) Execute(ctx context.Context) error {
 
 	p := pipeline.NewPipeline[context.Context]()
 	p.WithSteps(
-		p.NewStep("Fetch managed buckets", o.fetchManagedBuckets),
+		p.NewStep("Fetch managed buckets and namespaces", o.fetchManagedBucketsAndNamespaces),
 		p.NewStep("Get bucket usage", o.getBucketUsage),
 		p.NewStep("Get billing date", o.getBillingDate),
 		p.NewStep("Save to database", o.saveToDatabase),
@@ -79,9 +81,9 @@ func (o *ObjectStorage) getBucketUsage(ctx context.Context) error {
 	return nil
 }
 
-func (o *ObjectStorage) fetchManagedBuckets(ctx context.Context) error {
+func (o *ObjectStorage) fetchManagedBucketsAndNamespaces(ctx context.Context) error {
 	log := ctrl.LoggerFrom(ctx)
-	log.Info("Fetching buckets from cluster")
+	log.Info("Fetching buckets and namespaces from cluster")
 
 	buckets := exoscalev1.BucketList{}
 	log.V(1).Info("Listing buckets from cluster")
@@ -89,7 +91,14 @@ func (o *ObjectStorage) fetchManagedBuckets(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("cannot list buckets: %w", err)
 	}
-	o.bucketDetails = addOrgAndNamespaceToBucket(ctx, buckets)
+
+	log.V(1).Info("Listing namespaces from cluster")
+	namespaces, err := fetchNamespaceWithOrganizationMap(ctx, o.k8sClient)
+	if err != nil {
+		return fmt.Errorf("cannot list namespaces: %w", err)
+	}
+
+	o.bucketDetails = addOrgAndNamespaceToBucket(ctx, buckets, namespaces)
 	return nil
 }
 
@@ -148,7 +157,7 @@ func getAggregatedBuckets(ctx context.Context, sosBucketsUsage []oapi.SosBucketU
 	return aggregatedBuckets
 }
 
-func addOrgAndNamespaceToBucket(ctx context.Context, buckets exoscalev1.BucketList) []BucketDetail {
+func addOrgAndNamespaceToBucket(ctx context.Context, buckets exoscalev1.BucketList, namespaces map[string]string) []BucketDetail {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Gathering org and namespace from buckets")
 
@@ -157,17 +166,17 @@ func addOrgAndNamespaceToBucket(ctx context.Context, buckets exoscalev1.BucketLi
 		bucketDetail := BucketDetail{
 			BucketName: bucket.Spec.ForProvider.BucketName,
 		}
-		if organization, exist := bucket.ObjectMeta.Labels[service.OrganizationLabel]; exist {
-			bucketDetail.Organization = organization
-		} else {
-			// cannot get organization from bucket
-			log.Info("Organization label is missing in bucket, skipping...",
-				"label", service.OrganizationLabel,
-				"bucket", bucket.Name)
-			continue
-		}
 		if namespace, exist := bucket.ObjectMeta.Labels[service.NamespaceLabel]; exist {
+			organization, ok := namespaces[namespace]
+			if !ok {
+				// cannot find namespace in namespace list
+				log.Info("Namespace not found in namespace list, skipping...",
+					"namespace", namespace,
+					"bucket", bucket.Name)
+				continue
+			}
 			bucketDetail.Namespace = namespace
+			bucketDetail.Organization = organization
 		} else {
 			// cannot get namespace from bucket
 			log.Info("Namespace label is missing in bucket, skipping...",
@@ -182,4 +191,23 @@ func addOrgAndNamespaceToBucket(ctx context.Context, buckets exoscalev1.BucketLi
 		bucketDetails = append(bucketDetails, bucketDetail)
 	}
 	return bucketDetails
+}
+
+func fetchNamespaceWithOrganizationMap(ctx context.Context, k8sclient client.Client) (map[string]string, error) {
+	log := ctrl.LoggerFrom(ctx)
+	list := &corev1.NamespaceList{}
+	if err := k8sclient.List(ctx, list); err != nil {
+		return nil, fmt.Errorf("cannot get namespace list: %w", err)
+	}
+
+	namespaces := map[string]string{}
+	for _, ns := range list.Items {
+		org, ok := ns.Labels[service.OrganizationLabel]
+		if !ok {
+			log.Info("Organization label not found in namespace", "namespace", ns.Name)
+			continue
+		}
+		namespaces[ns.Name] = org
+	}
+	return namespaces, nil
 }
