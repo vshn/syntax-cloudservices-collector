@@ -1,14 +1,14 @@
-package cmd
+package log
 
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"strings"
 )
 
 type key struct{}
