@@ -23,6 +23,7 @@ func ExoscaleCmds() *cli.Command {
 		dbURL          string
 		k8sServerToken string
 		k8sServerURL   string
+		kubeconfig     string
 	)
 	return &cli.Command{
 		Name:  "exoscale",
@@ -68,6 +69,12 @@ func ExoscaleCmds() *cli.Command {
 				Usage:       "A Kubernetes server URL from where to get the data from",
 				Destination: &k8sServerURL,
 			},
+			&cli.StringFlag{
+				Name:        "kubeconfig",
+				EnvVars:     []string{"KUBECONFIG"},
+				Usage:       "Path to a kubeconfig file which will be used instead of url/token flags if set",
+				Destination: &kubeconfig,
+			},
 		},
 		Before: addCommandName,
 		Subcommands: []*cli.Command{
@@ -86,7 +93,7 @@ func ExoscaleCmds() *cli.Command {
 					}
 
 					log.Info("Creating k8s client")
-					k8sClient, err := cluster.InitK8sClient(k8sServerURL, k8sServerToken)
+					k8sClient, err := cluster.NewClient(kubeconfig, k8sServerURL, k8sServerToken)
 					if err != nil {
 						return fmt.Errorf("k8s client: %w", err)
 					}
@@ -110,7 +117,7 @@ func ExoscaleCmds() *cli.Command {
 					}
 
 					log.Info("Creating k8s client")
-					k8sClient, err := cluster.InitK8sClientDynamic(k8sServerURL, k8sServerToken)
+					k8sClient, err := cluster.NewDynamicClient(kubeconfig, k8sServerURL, k8sServerToken)
 					if err != nil {
 						return fmt.Errorf("k8s client: %w", err)
 					}
