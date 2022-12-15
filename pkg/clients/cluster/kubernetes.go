@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/vshn/provider-exoscale/apis"
 	corev1 "k8s.io/api/core/v1"
@@ -11,32 +12,49 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// InitK8sClient creates a k8s client from the server url and token url
-func InitK8sClient(url, token string) (client.Client, error) {
+// NewClient creates a k8s client from the server url and token url
+// If kubeconfig (path to it) is supplied, that takes precedence. Its use is mainly for local development
+// since local clusters usually don't have a valid certificate.
+func NewClient(kubeconfig, url, token string) (client.Client, error) {
 	scheme := runtime.NewScheme()
 	if err := corev1.AddToScheme(scheme); err != nil {
 		return nil, fmt.Errorf("core scheme: %w", err)
 	}
-	err := apis.AddToScheme(scheme)
-	if err != nil {
+	if err := apis.AddToScheme(scheme); err != nil {
 		return nil, fmt.Errorf("cannot add k8s exoscale scheme: %w", err)
 	}
-	config := rest.Config{Host: url, BearerToken: token}
-	k8sClient, err := client.New(&config, client.Options{
+
+	config, err := restConfig(kubeconfig, url, token)
+	if err != nil {
+		return nil, fmt.Errorf("k8s rest config: %w", err)
+	}
+
+	c, err := client.New(config, client.Options{
 		Scheme: scheme,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize k8s client: %w", err)
 	}
-	return k8sClient, nil
+	return c, nil
 }
 
-// InitK8sClientDynamic creates a dynamic k8s client from the server url and token url
-func InitK8sClientDynamic(url, token string) (dynamic.Interface, error) {
-	config := rest.Config{Host: url, BearerToken: token}
-	k8sClient, err := dynamic.NewForConfig(&config)
+// NewDynamicClient creates a dynamic k8s client from the server url and token url
+func NewDynamicClient(kubeconfig, url, token string) (dynamic.Interface, error) {
+	config, err := restConfig(kubeconfig, url, token)
+	if err != nil {
+		return nil, fmt.Errorf("k8s rest config: %w", err)
+	}
+	c, err := dynamic.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize k8s client: %w", err)
 	}
-	return k8sClient, nil
+	return c, nil
+}
+
+func restConfig(kubeconfig string, url string, token string) (*rest.Config, error) {
+	// kubeconfig takes precedence if set.
+	if kubeconfig != "" {
+		return clientcmd.BuildConfigFromFlags("", kubeconfig)
+	}
+	return &rest.Config{Host: url, BearerToken: token}, nil
 }

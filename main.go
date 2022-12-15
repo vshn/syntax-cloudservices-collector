@@ -93,6 +93,7 @@ func newApp() (context.Context, context.CancelFunc, *cli.App) {
 		},
 		Commands: []*cli.Command{
 			cmd.ExoscaleCmds(),
+			cmd.CloudscaleCmds(),
 		},
 		ExitErrHandler: func(c *cli.Context, err error) {
 			if err != nil {
