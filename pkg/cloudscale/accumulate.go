@@ -35,8 +35,7 @@ func (k AccumulateKey) String() string {
 /*
 accumulateBucketMetrics gets all the bucket metrics from cloudscale and puts them into a map. The map key is the "AccumulateKey",
 and the value is the raw value of the data returned by cloudscale (e.g. bytes, requests). In order to construct the
-correct AccumulateKey, this function needs to fetch the ObjectUsers's tags, because that's where the zone, tenant and
-namespace are stored.
+correct AccumulateKey, this function needs to fetch the namespace and bucket custom resources, because that's where the tenant is stored.
 This method is "accumulating" data because it collects data from possibly multiple ObjectsUsers under the same
 AccumulateKey. This is because the billing system can't handle multiple ObjectsUsers per namespace.
 */

@@ -94,6 +94,8 @@ local cronjob(name, subcommand, schedule) = {
   },
 };
 
+assert params.exoscale.enabled != params.cloudscale.enabled : 'only one of the components can be enabled: cloudscale or exoscale. not both and not neither.';
+
 (if params.exoscale.enabled then {
   local secrets = params.secrets['exoscale'],
   assert secrets != null : 'secrets must be set.',
