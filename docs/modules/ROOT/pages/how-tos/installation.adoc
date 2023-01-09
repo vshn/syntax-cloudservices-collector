@@ -8,7 +8,7 @@ It also requires an Exoscale IAMKey and a Kubernetes/OpenShift Service Account t
 
 == Sources
 
-The data is matched from k8s cluster and Exoscale organization.
+The data is matched from a k8s cluster and an Exoscale organization.
 The Kubernetes Service Account token is required to have `get` permissions on `Namespaces` and to the following managed resources:
 
 * `buckets.exoscale.crossplane.io`
@@ -16,8 +16,14 @@ The Kubernetes Service Account token is required to have `get` permissions on `N
 * `mysqls.exoscale.crossplane.io`
 * `redis.exoscale.crossplane.io`
 * `kafkas.exoscale.crossplane.io`
+* `opensearches.exoscale.crossplane.io`
 
+=== Exoscale organization
 The Access Key (IAM Key) from an Exoscale organization is required to have read access across all managed resources (e.g. SOS buckets, Postgres, etc).
+
+=== K8s cluster
+The access to the desired cluster from where the metrics should be collected has to be configured. The current configuration for each instance is done in the
+`syn-tenant-repo` under `manifests/<desired-cluster>/billing`
 
 == Example
 
