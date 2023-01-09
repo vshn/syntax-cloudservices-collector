@@ -20,8 +20,8 @@ parameters:
     images:
       collector:
         registry: 'ghcr.io'
-        repository: 'vshn/exoscale-metrics-collector'
-        tag: 'v0.4.0'
+        repository: 'vshn/metrics-collector'
+        tag: 'refactored-collectors'
 
     exoscale:
       enabled: false

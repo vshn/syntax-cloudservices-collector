@@ -34,7 +34,7 @@ spec:
               envFrom:
                 - secretRef:
                     name: credentials-collector-cloudscale-lpg-2
-              image: ghcr.io/vshn/exoscale-metrics-collector:v0.4.0
+              image: ghcr.io/vshn/metrics-collector:refactored-collectors
               name: metrics-collector-backfill
               resources: {}
           restartPolicy: OnFailure
