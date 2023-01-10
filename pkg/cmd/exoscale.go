@@ -6,13 +6,14 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/vshn/exoscale-metrics-collector/pkg/clients/cluster"
 	"github.com/vshn/exoscale-metrics-collector/pkg/clients/exoscale"
-	"github.com/vshn/exoscale-metrics-collector/pkg/service/dbaas"
-	"github.com/vshn/exoscale-metrics-collector/pkg/service/sos"
+	"github.com/vshn/exoscale-metrics-collector/pkg/exoscale/dbaas"
+	"github.com/vshn/exoscale-metrics-collector/pkg/exoscale/sos"
+	"github.com/vshn/exoscale-metrics-collector/pkg/log"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 func addCommandName(c *cli.Context) error {
-	c.Context = NewLoggingContext(c.Context, AppLogger(c.Context).WithName(c.Command.Name))
+	c.Context = log.NewLoggingContext(c.Context, log.AppLogger(c.Context).WithName(c.Command.Name))
 	return nil
 }
 
@@ -23,6 +24,7 @@ func ExoscaleCmds() *cli.Command {
 		dbURL          string
 		k8sServerToken string
 		k8sServerURL   string
+		kubeconfig     string
 	)
 	return &cli.Command{
 		Name:  "exoscale",
@@ -68,6 +70,12 @@ func ExoscaleCmds() *cli.Command {
 				Usage:       "A Kubernetes server URL from where to get the data from",
 				Destination: &k8sServerURL,
 			},
+			&cli.StringFlag{
+				Name:        "kubeconfig",
+				EnvVars:     []string{"KUBECONFIG"},
+				Usage:       "Path to a kubeconfig file which will be used instead of url/token flags if set",
+				Destination: &kubeconfig,
+			},
 		},
 		Before: addCommandName,
 		Subcommands: []*cli.Command{
@@ -76,7 +84,7 @@ func ExoscaleCmds() *cli.Command {
 				Usage:  "Get metrics from object storage service",
 				Before: addCommandName,
 				Action: func(c *cli.Context) error {
-					log := AppLogger(c.Context)
+					log := log.AppLogger(c.Context)
 					ctrl.SetLogger(log)
 
 					log.Info("Creating Exoscale client")
@@ -86,7 +94,7 @@ func ExoscaleCmds() *cli.Command {
 					}
 
 					log.Info("Creating k8s client")
-					k8sClient, err := cluster.InitK8sClient(k8sServerURL, k8sServerToken)
+					k8sClient, err := cluster.NewClient(kubeconfig, k8sServerURL, k8sServerToken)
 					if err != nil {
 						return fmt.Errorf("k8s client: %w", err)
 					}
@@ -100,7 +108,7 @@ func ExoscaleCmds() *cli.Command {
 				Usage:  "Get metrics from database service",
 				Before: addCommandName,
 				Action: func(c *cli.Context) error {
-					log := AppLogger(c.Context)
+					log := log.AppLogger(c.Context)
 					ctrl.SetLogger(log)
 
 					log.Info("Creating Exoscale client")
@@ -110,7 +118,7 @@ func ExoscaleCmds() *cli.Command {
 					}
 
 					log.Info("Creating k8s client")
-					k8sClient, err := cluster.InitK8sClientDynamic(k8sServerURL, k8sServerToken)
+					k8sClient, err := cluster.NewDynamicClient(kubeconfig, k8sServerURL, k8sServerToken)
 					if err != nil {
 						return fmt.Errorf("k8s client: %w", err)
 					}

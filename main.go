@@ -11,6 +11,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 	"github.com/vshn/exoscale-metrics-collector/pkg/cmd"
+	"github.com/vshn/exoscale-metrics-collector/pkg/log"
 )
 
 var (
@@ -69,18 +70,18 @@ func newApp() (context.Context, context.CancelFunc, *cli.App) {
 			},
 		},
 		Before: func(c *cli.Context) error {
-			logger, err := cmd.NewLogger(appName, version, logLevel, logFormat)
+			logger, err := log.NewLogger(appName, version, logLevel, logFormat)
 			if err != nil {
 				return fmt.Errorf("before: %w", err)
 			}
-			c.Context = cmd.NewLoggingContext(c.Context, logger)
+			c.Context = log.NewLoggingContext(c.Context, logger)
 			return nil
 		},
 		Action: func(c *cli.Context) error {
 			if true {
 				return cli.ShowAppHelp(c)
 			}
-			cmd.AppLogger(c.Context).WithValues(
+			log.AppLogger(c.Context).WithValues(
 				"date", date,
 				"commit", commit,
 				"go_os", runtime.GOOS,
@@ -93,10 +94,11 @@ func newApp() (context.Context, context.CancelFunc, *cli.App) {
 		},
 		Commands: []*cli.Command{
 			cmd.ExoscaleCmds(),
+			cmd.CloudscaleCmds(),
 		},
 		ExitErrHandler: func(c *cli.Context, err error) {
 			if err != nil {
-				cmd.AppLogger(c.Context).Error(err, "fatal error")
+				log.AppLogger(c.Context).Error(err, "fatal error")
 				cli.HandleExitCoder(cli.Exit("", 1))
 			}
 		},
