@@ -3,11 +3,12 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/cloudscale-ch/cloudscale-go-sdk/v2"
 	"github.com/urfave/cli/v2"
-	"github.com/vshn/exoscale-metrics-collector/pkg/clients/cluster"
 	cs "github.com/vshn/exoscale-metrics-collector/pkg/cloudscale"
+	"github.com/vshn/exoscale-metrics-collector/pkg/kubernetes"
 	"github.com/vshn/exoscale-metrics-collector/pkg/log"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -62,7 +63,7 @@ func CloudscaleCmds() *cli.Command {
 			&cli.IntFlag{
 				Name:        "days",
 				EnvVars:     []string{"DAYS"},
-				Required:    true,
+				Value:       1,
 				Usage:       "Days of metrics to fetch since today",
 				Destination: &days,
 			},
@@ -74,20 +75,30 @@ func CloudscaleCmds() *cli.Command {
 				Usage:  "Get metrics from object storage service",
 				Before: addCommandName,
 				Action: func(c *cli.Context) error {
-					log := log.AppLogger(c.Context)
-					ctrl.SetLogger(log)
+					logger := log.Logger(c.Context)
+					ctrl.SetLogger(logger)
 
-					log.Info("Creating cloudscale client")
+					logger.Info("Creating cloudscale client")
 					cloudscaleClient := cloudscale.NewClient(http.DefaultClient)
 					cloudscaleClient.AuthToken = apiToken
 
-					log.Info("Creating k8s client")
-					k8sClient, err := cluster.NewClient(kubeconfig, kubernetesServerURL, kubernetesServerToken)
+					logger.Info("Creating k8s client")
+					k8sClient, err := kubernetes.NewClient(kubeconfig, kubernetesServerURL, kubernetesServerToken)
 					if err != nil {
 						return fmt.Errorf("k8s client: %w", err)
 					}
 
-					o := cs.NewObjectStorage(cloudscaleClient, k8sClient, days, dbURL)
+					location, err := time.LoadLocation("Europe/Zurich")
+					if err != nil {
+						return fmt.Errorf("load loaction: %w", err)
+					}
+					now := time.Now().In(location)
+					billingDate := time.Date(now.Year(), now.Month(), now.Day()-days, 0, 0, 0, 0, now.Location())
+
+					o, err := cs.NewObjectStorage(cloudscaleClient, k8sClient, dbURL, billingDate)
+					if err != nil {
+						return fmt.Errorf("object storage: %w", err)
+					}
 					return o.Execute(c.Context)
 				},
 			},

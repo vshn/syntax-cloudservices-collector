@@ -2,29 +2,31 @@ package cmd
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/urfave/cli/v2"
-	"github.com/vshn/exoscale-metrics-collector/pkg/clients/cluster"
-	"github.com/vshn/exoscale-metrics-collector/pkg/clients/exoscale"
-	"github.com/vshn/exoscale-metrics-collector/pkg/exoscale/dbaas"
-	"github.com/vshn/exoscale-metrics-collector/pkg/exoscale/sos"
+	"github.com/vshn/exoscale-metrics-collector/pkg/exoscale"
+	"github.com/vshn/exoscale-metrics-collector/pkg/kubernetes"
 	"github.com/vshn/exoscale-metrics-collector/pkg/log"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+// billingHour represents the hour when metrics are collected
+const billingHour = 6
+
 func addCommandName(c *cli.Context) error {
-	c.Context = log.NewLoggingContext(c.Context, log.AppLogger(c.Context).WithName(c.Command.Name))
+	c.Context = log.NewLoggingContext(c.Context, log.Logger(c.Context).WithName(c.Command.Name))
 	return nil
 }
 
 func ExoscaleCmds() *cli.Command {
 	var (
-		secret         string
-		accessKey      string
-		dbURL          string
-		k8sServerToken string
-		k8sServerURL   string
-		kubeconfig     string
+		secret                string
+		accessKey             string
+		dbURL                 string
+		kubernetesServerToken string
+		kubernetesServerURL   string
+		kubeconfig            string
 	)
 	return &cli.Command{
 		Name:  "exoscale",
@@ -48,27 +50,24 @@ func ExoscaleCmds() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:        "database-url",
-				Aliases:     []string{"d"},
 				EnvVars:     []string{"ACR_DB_URL"},
 				Required:    true,
 				Usage:       "A PostgreSQL database URL where to save relevant metrics",
 				Destination: &dbURL,
 			},
 			&cli.StringFlag{
-				Name:        "k8s-server-token",
-				Aliases:     []string{"t"},
-				EnvVars:     []string{"K8S_TOKEN"},
-				Required:    true,
-				Usage:       "A Kubernetes server token which can view buckets.exoscale.crossplane.io resources",
-				Destination: &k8sServerToken,
-			},
-			&cli.StringFlag{
-				Name:        "k8s-server-url",
-				Aliases:     []string{"u"},
-				EnvVars:     []string{"K8S_SERVER_URL"},
+				Name:        "kubernetes-server-url",
+				EnvVars:     []string{"KUBERNETES_SERVER_URL"},
 				Required:    true,
 				Usage:       "A Kubernetes server URL from where to get the data from",
-				Destination: &k8sServerURL,
+				Destination: &kubernetesServerURL,
+			},
+			&cli.StringFlag{
+				Name:        "kubernetes-server-token",
+				EnvVars:     []string{"KUBERNETES_SERVER_TOKEN"},
+				Required:    true,
+				Usage:       "A Kubernetes server token which can view buckets.cloudscale.crossplane.io resources",
+				Destination: &kubernetesServerToken,
 			},
 			&cli.StringFlag{
 				Name:        "kubeconfig",
@@ -84,22 +83,29 @@ func ExoscaleCmds() *cli.Command {
 				Usage:  "Get metrics from object storage service",
 				Before: addCommandName,
 				Action: func(c *cli.Context) error {
-					log := log.AppLogger(c.Context)
-					ctrl.SetLogger(log)
+					logger := log.Logger(c.Context)
+					ctrl.SetLogger(logger)
 
-					log.Info("Creating Exoscale client")
-					exoscaleClient, err := exoscale.InitClient(accessKey, secret)
+					logger.Info("Creating Exoscale client")
+					exoscaleClient, err := exoscale.NewClient(accessKey, secret)
 					if err != nil {
 						return fmt.Errorf("exoscale client: %w", err)
 					}
 
-					log.Info("Creating k8s client")
-					k8sClient, err := cluster.NewClient(kubeconfig, k8sServerURL, k8sServerToken)
+					logger.Info("Creating k8s client")
+					k8sClient, err := kubernetes.NewClient(kubeconfig, kubernetesServerURL, kubernetesServerToken)
 					if err != nil {
 						return fmt.Errorf("k8s client: %w", err)
 					}
 
-					o := sos.NewObjectStorage(exoscaleClient, k8sClient, dbURL)
+					now := time.Now().In(time.UTC)
+					previousDay := now.Day() - 1
+					billingDate := time.Date(now.Year(), now.Month(), previousDay, billingHour, 0, 0, 0, now.Location())
+
+					o, err := exoscale.NewObjectStorage(exoscaleClient, k8sClient, dbURL, billingDate)
+					if err != nil {
+						return fmt.Errorf("object storage: %w", err)
+					}
 					return o.Execute(c.Context)
 				},
 			},
@@ -108,22 +114,27 @@ func ExoscaleCmds() *cli.Command {
 				Usage:  "Get metrics from database service",
 				Before: addCommandName,
 				Action: func(c *cli.Context) error {
-					log := log.AppLogger(c.Context)
-					ctrl.SetLogger(log)
+					logger := log.Logger(c.Context)
+					ctrl.SetLogger(logger)
 
-					log.Info("Creating Exoscale client")
-					exoscaleClient, err := exoscale.InitClient(accessKey, secret)
+					logger.Info("Creating Exoscale client")
+					exoscaleClient, err := exoscale.NewClient(accessKey, secret)
 					if err != nil {
 						return fmt.Errorf("exoscale client: %w", err)
 					}
 
-					log.Info("Creating k8s client")
-					k8sClient, err := cluster.NewDynamicClient(kubeconfig, k8sServerURL, k8sServerToken)
+					logger.Info("Creating k8s client")
+					k8sClient, err := kubernetes.NewClient(kubeconfig, kubernetesServerURL, kubernetesServerToken)
 					if err != nil {
 						return fmt.Errorf("k8s client: %w", err)
 					}
 
-					o := dbaas.NewDBaaSService(exoscaleClient, k8sClient, dbURL)
+					billingDate := time.Now().In(time.UTC).Truncate(time.Hour)
+
+					o, err := exoscale.NewDBaaS(exoscaleClient, k8sClient, dbURL, billingDate)
+					if err != nil {
+						return fmt.Errorf("dbaas service: %w", err)
+					}
 					return o.Execute(c.Context)
 				},
 			},
