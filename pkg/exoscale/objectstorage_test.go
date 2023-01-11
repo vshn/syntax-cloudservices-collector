@@ -1,4 +1,4 @@
-package sos
+package exoscale
 
 import (
 	"context"
@@ -8,8 +8,7 @@ import (
 
 	"github.com/exoscale/egoscale/v2/oapi"
 	"github.com/stretchr/testify/assert"
-	db "github.com/vshn/exoscale-metrics-collector/pkg/database"
-	common "github.com/vshn/exoscale-metrics-collector/pkg/exoscale"
+	db "github.com/vshn/exoscale-metrics-collector/pkg/dbaas"
 	exoscalev1 "github.com/vshn/provider-exoscale/apis/exoscale/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -159,10 +158,10 @@ func TestObjectStorage_addOrgAndNamespaceToBucket(t *testing.T) {
 func createBucket(name, namespace, organization string) exoscalev1.Bucket {
 	labels := make(map[string]string)
 	if namespace != "" {
-		labels[common.NamespaceLabel] = namespace
+		labels[namespaceLabel] = namespace
 	}
 	if organization != "" {
-		labels[common.OrganizationLabel] = organization
+		labels[organizationLabel] = organization
 	}
 	return exoscalev1.Bucket{
 		ObjectMeta: metav1.ObjectMeta{

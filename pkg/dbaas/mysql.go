@@ -1,4 +1,4 @@
-package database
+package dbaas
 
 import (
 	"database/sql"

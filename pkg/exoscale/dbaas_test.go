@@ -1,4 +1,4 @@
-package dbaas
+package exoscale
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 
 	egoscale "github.com/exoscale/egoscale/v2"
 	"github.com/stretchr/testify/assert"
-	db "github.com/vshn/exoscale-metrics-collector/pkg/database"
+	db "github.com/vshn/exoscale-metrics-collector/pkg/dbaas"
 )
 
 func TestDBaaS_aggregatedDBaaS(t *testing.T) {

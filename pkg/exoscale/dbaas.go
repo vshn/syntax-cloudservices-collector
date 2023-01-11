@@ -1,4 +1,4 @@
-package dbaas
+package exoscale
 
 import (
 	"context"
@@ -7,62 +7,59 @@ import (
 
 	egoscale "github.com/exoscale/egoscale/v2"
 	"github.com/go-logr/logr"
-	"github.com/vshn/exoscale-metrics-collector/pkg/clients/exoscale"
-	db "github.com/vshn/exoscale-metrics-collector/pkg/database"
-	common "github.com/vshn/exoscale-metrics-collector/pkg/exoscale"
+	db "github.com/vshn/exoscale-metrics-collector/pkg/dbaas"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
+	k8s "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
-	groupVersionResources = map[string]schema.GroupVersionResource{
+	groupVersionKinds = map[string]schema.GroupVersionKind{
 		"pg": {
-			Group:    "exoscale.crossplane.io",
-			Version:  "v1",
-			Resource: "postgresqls",
+			Group:   "exoscale.crossplane.io",
+			Version: "v1",
+			Kind:    "PostgreSQLList",
 		},
 		"mysql": {
-			Group:    "exoscale.crossplane.io",
-			Version:  "v1",
-			Resource: "mysqls",
+			Group:   "exoscale.crossplane.io",
+			Version: "v1",
+			Kind:    "MySQLList",
 		},
 		"opensearch": {
-			Group:    "exoscale.crossplane.io",
-			Version:  "v1",
-			Resource: "opensearches",
+			Group:   "exoscale.crossplane.io",
+			Version: "v1",
+			Kind:    "OpenSearchList",
 		},
 		"redis": {
-			Group:    "exoscale.crossplane.io",
-			Version:  "v1",
-			Resource: "redis",
+			Group:   "exoscale.crossplane.io",
+			Version: "v1",
+			Kind:    "RedisList",
 		},
 		"kafka": {
-			Group:    "exoscale.crossplane.io",
-			Version:  "v1",
-			Resource: "kafkas",
+			Group:   "exoscale.crossplane.io",
+			Version: "v1",
+			Kind:    "KafkaList",
 		},
 	}
 )
 
 // Detail a helper structure for intermediate operations
 type Detail struct {
-	Organization, DBName, Namespace, Plan, Zone, Type string
+	Organization, DBName, Namespace, Plan, Zone, Kind string
 }
 
 // Service provides DBaaS Database info and required clients
 type Service struct {
 	exoscaleClient *egoscale.Client
-	k8sClient      dynamic.Interface
+	k8sClient      k8s.Client
 	database       *db.DBaaSDatabase
 }
 
 // NewDBaaSService creates a Service with the initial setup
-func NewDBaaSService(exoscaleClient *egoscale.Client, k8sClient dynamic.Interface, databaseURL string) (*Service, error) {
-	location, err := time.LoadLocation(common.ExoscaleTimeZone)
+func NewDBaaSService(exoscaleClient *egoscale.Client, k8sClient k8s.Client, databaseURL string) (*Service, error) {
+	location, err := time.LoadLocation(timeZone)
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize location from time zone %s: %w", location, err)
 	}
@@ -119,17 +116,19 @@ func (s *Service) fetchManagedDBaaSAndNamespaces(ctx context.Context) ([]Detail,
 	}
 
 	var dbaasDetails []Detail
-	for _, groupVersionResource := range groupVersionResources {
-		managedResources, err := s.k8sClient.Resource(groupVersionResource).List(ctx, metav1.ListOptions{})
+	for _, gvk := range groupVersionKinds {
+		metaList := &metav1.PartialObjectMetadataList{}
+		metaList.SetGroupVersionKind(gvk)
+		err := s.k8sClient.List(ctx, metaList)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				continue
 			}
-			return nil, fmt.Errorf("cannot list managed resource %s from cluster: %w", groupVersionResource.Resource, err)
+			return nil, fmt.Errorf("cannot list managed resource kind %s from cluster: %w", gvk.Kind, err)
 		}
 
-		for _, managedResource := range managedResources.Items {
-			dbaasDetail := findDBaaSDetailInNamespacesMap(managedResource, groupVersionResource, namespaces, log)
+		for _, item := range metaList.Items {
+			dbaasDetail := findDBaaSDetailInNamespacesMap(item, gvk, namespaces, log)
 			if dbaasDetail == nil {
 				continue
 			}
@@ -140,18 +139,18 @@ func (s *Service) fetchManagedDBaaSAndNamespaces(ctx context.Context) ([]Detail,
 	return dbaasDetails, nil
 }
 
-func findDBaaSDetailInNamespacesMap(managedResource unstructured.Unstructured, groupVersionResource schema.GroupVersionResource, namespaces map[string]string, log logr.Logger) *Detail {
+func findDBaaSDetailInNamespacesMap(resource metav1.PartialObjectMetadata, gvk schema.GroupVersionKind, namespaces map[string]string, log logr.Logger) *Detail {
 	dbaasDetail := Detail{
-		DBName: managedResource.GetName(),
-		Type:   groupVersionResource.Resource,
+		DBName: resource.GetName(),
+		Kind:   gvk.Kind,
 	}
-	if namespace, exist := managedResource.GetLabels()[common.NamespaceLabel]; exist {
+	if namespace, exist := resource.GetLabels()[namespaceLabel]; exist {
 		organization, ok := namespaces[namespace]
 		if !ok {
 			// cannot find namespace in namespace list
 			log.Info("Namespace not found in namespace list, skipping...",
 				"namespace", namespace,
-				"dbaas", managedResource.GetName())
+				"dbaas", resource.GetName())
 			return nil
 		}
 		dbaasDetail.Namespace = namespace
@@ -159,12 +158,12 @@ func findDBaaSDetailInNamespacesMap(managedResource unstructured.Unstructured, g
 	} else {
 		// cannot get namespace from DBaaS
 		log.Info("Namespace label is missing in DBaaS, skipping...",
-			"label", common.NamespaceLabel,
-			"dbaas", managedResource.GetName())
+			"label", namespaceLabel,
+			"dbaas", resource.GetName())
 		return nil
 	}
 	log.V(1).Info("Added namespace and organization to DBaaS",
-		"dbaas", managedResource.GetName(),
+		"dbaas", resource.GetName(),
 		"namespace", dbaasDetail.Namespace,
 		"organization", dbaasDetail.Organization)
 	return &dbaasDetail
@@ -176,7 +175,7 @@ func (s *Service) fetchDBaaSUsage(ctx context.Context) ([]*egoscale.DatabaseServ
 	log.Info("Fetching DBaaS usage from Exoscale")
 
 	var databaseServices []*egoscale.DatabaseService
-	for _, zone := range exoscale.Zones {
+	for _, zone := range Zones {
 		databaseServicesByZone, err := s.exoscaleClient.ListDatabaseServices(ctx, zone)
 		if err != nil {
 			log.V(1).Error(err, "Cannot get exoscale database services on zone", "zone", zone)
@@ -203,7 +202,7 @@ func aggregateDBaaS(ctx context.Context, exoscaleDBaaS []*egoscale.DatabaseServi
 		log.V(1).Info("Checking DBaaS", "instance", dbaasDetail.DBName)
 
 		dbaasUsage, exists := dbaasServiceUsageMap[dbaasDetail.DBName]
-		if exists && dbaasDetail.Type == groupVersionResources[*dbaasUsage.Type].Resource {
+		if exists && dbaasDetail.Kind == groupVersionKinds[*dbaasUsage.Type].Kind {
 			log.V(1).Info("Found exoscale dbaas usage", "instance", dbaasUsage.Name, "instance created", dbaasUsage.CreatedAt)
 			key := db.NewKey(dbaasDetail.Namespace, *dbaasUsage.Plan, *dbaasUsage.Type)
 			aggregated := aggregatedDBaasS[key]
@@ -217,28 +216,4 @@ func aggregateDBaaS(ctx context.Context, exoscaleDBaaS []*egoscale.DatabaseServi
 	}
 
 	return aggregatedDBaasS
-}
-
-func fetchNamespaceWithOrganizationMap(ctx context.Context, k8sClient dynamic.Interface) (map[string]string, error) {
-	log := ctrl.LoggerFrom(ctx)
-	nsGroupVersionResource := schema.GroupVersionResource{
-		Group:    "",
-		Version:  "v1",
-		Resource: "namespaces",
-	}
-	list, err := k8sClient.Resource(nsGroupVersionResource).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("cannot get namespace list: %w", err)
-	}
-
-	namespaces := map[string]string{}
-	for _, ns := range list.Items {
-		org, ok := ns.GetLabels()[common.OrganizationLabel]
-		if !ok {
-			log.Info("Organization label not found in namespace", "namespace", ns.GetName())
-			continue
-		}
-		namespaces[ns.GetName()] = org
-	}
-	return namespaces, nil
 }

@@ -4,10 +4,8 @@ import (
 	"fmt"
 
 	"github.com/urfave/cli/v2"
-	"github.com/vshn/exoscale-metrics-collector/pkg/clients/cluster"
-	"github.com/vshn/exoscale-metrics-collector/pkg/clients/exoscale"
-	"github.com/vshn/exoscale-metrics-collector/pkg/exoscale/dbaas"
-	"github.com/vshn/exoscale-metrics-collector/pkg/exoscale/sos"
+	"github.com/vshn/exoscale-metrics-collector/pkg/exoscale"
+	"github.com/vshn/exoscale-metrics-collector/pkg/kubernetes"
 	"github.com/vshn/exoscale-metrics-collector/pkg/log"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -94,12 +92,12 @@ func ExoscaleCmds() *cli.Command {
 					}
 
 					logger.Info("Creating k8s client")
-					k8sClient, err := cluster.NewClient(kubeconfig, k8sServerURL, k8sServerToken)
+					k8sClient, err := kubernetes.NewClient(kubeconfig, k8sServerURL, k8sServerToken)
 					if err != nil {
 						return fmt.Errorf("k8s client: %w", err)
 					}
 
-					o, err := sos.NewObjectStorage(exoscaleClient, k8sClient, dbURL)
+					o, err := exoscale.NewObjectStorage(exoscaleClient, k8sClient, dbURL)
 					if err != nil {
 						return fmt.Errorf("object storage: %w", err)
 					}
@@ -121,12 +119,12 @@ func ExoscaleCmds() *cli.Command {
 					}
 
 					logger.Info("Creating k8s client")
-					k8sClient, err := cluster.NewDynamicClient(kubeconfig, k8sServerURL, k8sServerToken)
+					k8sClient, err := kubernetes.NewClient(kubeconfig, k8sServerURL, k8sServerToken)
 					if err != nil {
 						return fmt.Errorf("k8s client: %w", err)
 					}
 
-					o, err := dbaas.NewDBaaSService(exoscaleClient, k8sClient, dbURL)
+					o, err := exoscale.NewDBaaSService(exoscaleClient, k8sClient, dbURL)
 					if err != nil {
 						return fmt.Errorf("dbaas service: %w", err)
 					}

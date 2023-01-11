@@ -6,8 +6,8 @@ import (
 
 	"github.com/cloudscale-ch/cloudscale-go-sdk/v2"
 	"github.com/urfave/cli/v2"
-	"github.com/vshn/exoscale-metrics-collector/pkg/clients/cluster"
 	cs "github.com/vshn/exoscale-metrics-collector/pkg/cloudscale"
+	"github.com/vshn/exoscale-metrics-collector/pkg/kubernetes"
 	"github.com/vshn/exoscale-metrics-collector/pkg/log"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -82,7 +82,7 @@ func CloudscaleCmds() *cli.Command {
 					cloudscaleClient.AuthToken = apiToken
 
 					logger.Info("Creating k8s client")
-					k8sClient, err := cluster.NewClient(kubeconfig, kubernetesServerURL, kubernetesServerToken)
+					k8sClient, err := kubernetes.NewClient(kubeconfig, kubernetesServerURL, kubernetesServerToken)
 					if err != nil {
 						return fmt.Errorf("k8s client: %w", err)
 					}
