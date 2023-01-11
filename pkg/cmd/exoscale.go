@@ -13,7 +13,7 @@ import (
 )
 
 func addCommandName(c *cli.Context) error {
-	c.Context = log.NewLoggingContext(c.Context, log.AppLogger(c.Context).WithName(c.Command.Name))
+	c.Context = log.NewLoggingContext(c.Context, log.Logger(c.Context).WithName(c.Command.Name))
 	return nil
 }
 
@@ -84,7 +84,7 @@ func ExoscaleCmds() *cli.Command {
 				Usage:  "Get metrics from object storage service",
 				Before: addCommandName,
 				Action: func(c *cli.Context) error {
-					logger := log.AppLogger(c.Context)
+					logger := log.Logger(c.Context)
 					ctrl.SetLogger(logger)
 
 					logger.Info("Creating Exoscale client")
@@ -111,7 +111,7 @@ func ExoscaleCmds() *cli.Command {
 				Usage:  "Get metrics from database service",
 				Before: addCommandName,
 				Action: func(c *cli.Context) error {
-					logger := log.AppLogger(c.Context)
+					logger := log.Logger(c.Context)
 					ctrl.SetLogger(logger)
 
 					logger.Info("Creating Exoscale client")

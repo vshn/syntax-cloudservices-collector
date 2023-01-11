@@ -74,7 +74,7 @@ func CloudscaleCmds() *cli.Command {
 				Usage:  "Get metrics from object storage service",
 				Before: addCommandName,
 				Action: func(c *cli.Context) error {
-					logger := log.AppLogger(c.Context)
+					logger := log.Logger(c.Context)
 					ctrl.SetLogger(logger)
 
 					logger.Info("Creating cloudscale client")

@@ -81,7 +81,7 @@ func newApp() (context.Context, context.CancelFunc, *cli.App) {
 			if true {
 				return cli.ShowAppHelp(c)
 			}
-			log.AppLogger(c.Context).WithValues(
+			log.Logger(c.Context).WithValues(
 				"date", date,
 				"commit", commit,
 				"go_os", runtime.GOOS,
@@ -98,7 +98,7 @@ func newApp() (context.Context, context.CancelFunc, *cli.App) {
 		},
 		ExitErrHandler: func(c *cli.Context, err error) {
 			if err != nil {
-				log.AppLogger(c.Context).Error(err, "fatal error")
+				log.Logger(c.Context).Error(err, "fatal error")
 				cli.HandleExitCoder(cli.Exit("", 1))
 			}
 		},

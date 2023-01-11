@@ -18,7 +18,7 @@ var loggingKey key
 func NewLoggingContext(ctx context.Context, logger logr.Logger) context.Context {
 	return context.WithValue(ctx, loggingKey, logger)
 }
-func AppLogger(ctx context.Context) logr.Logger {
+func Logger(ctx context.Context) logr.Logger {
 	logger, ok := ctx.Value(loggingKey).(logr.Logger)
 	if !ok {
 		panic("logging not set up in context")
