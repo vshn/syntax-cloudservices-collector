@@ -29,14 +29,15 @@ type SosDatabase struct {
 
 // Execute starts the saving process of the data in the billing database
 func (s *SosDatabase) Execute(ctx context.Context, aggregated map[Key]Aggregated) error {
-	log := ctrl.LoggerFrom(ctx)
-	store, err := reporting.NewStore(s.URL, log.WithName("reporting-store"))
+	logger := ctrl.LoggerFrom(ctx)
+
+	store, err := reporting.NewStore(s.URL, logger.WithName("reporting-store"))
 	if err != nil {
 		return fmt.Errorf("reporting.NewStore: %w", err)
 	}
 	defer func() {
 		if err := store.Close(); err != nil {
-			log.Error(err, "unable to close")
+			logger.Error(err, "unable to close")
 		}
 	}()
 
@@ -55,11 +56,12 @@ func (s *SosDatabase) Execute(ctx context.Context, aggregated map[Key]Aggregated
 
 // saveUsageToDatabase saves each previously aggregated buckets to the billing database
 func (s *SosDatabase) saveUsageToDatabase(ctx context.Context, store *reporting.Store, aggregatedObjects map[Key]Aggregated) error {
-	log := ctrl.LoggerFrom(ctx)
+	logger := ctrl.LoggerFrom(ctx)
+
 	for _, aggregated := range aggregatedObjects {
 		err := s.ensureBucketUsage(ctx, store, aggregated)
 		if err != nil {
-			log.Error(err, "cannot save aggregated buckets service record to billing database")
+			logger.Error(err, "cannot save aggregated buckets service record to billing database")
 			continue
 		}
 	}
@@ -70,7 +72,7 @@ func (s *SosDatabase) saveUsageToDatabase(ctx context.Context, store *reporting.
 // To save the correct data to the database the function also matches a relevant product, discount (if any) and query.
 // The storage usage is referred to a day before the application ran (yesterday)
 func (s *SosDatabase) ensureBucketUsage(ctx context.Context, store *reporting.Store, aggregatedBucket Aggregated) error {
-	log := ctrl.LoggerFrom(ctx)
+	logger := ctrl.LoggerFrom(ctx)
 
 	tokens, err := aggregatedBucket.DecodeKey()
 	if err != nil {
@@ -82,7 +84,7 @@ func (s *SosDatabase) ensureBucketUsage(ctx context.Context, store *reporting.St
 	}
 	namespace := tokens[0]
 
-	log.Info("Saving buckets usage for namespace", "namespace", namespace, "storage used", aggregatedBucket.Value)
+	logger.Info("Saving buckets usage for namespace", "namespace", namespace, "storage used", aggregatedBucket.Value)
 	organization := aggregatedBucket.Organization
 	value := aggregatedBucket.Value
 
@@ -90,50 +92,19 @@ func (s *SosDatabase) ensureBucketUsage(ctx context.Context, store *reporting.St
 		ObjectType: SosType,
 		provider:   provider,
 	}
+	value, err = adjustStorageSizeUnit(value)
+	if err != nil {
+		return fmt.Errorf("adjustStorageSizeUnit(%v): %w", value, err)
+	}
 
-	return store.WithTransaction(ctx, func(tx *sqlx.Tx) error {
-		tenant, err := reporting.EnsureTenant(ctx, tx, &db.Tenant{Source: organization})
-		if err != nil {
-			return fmt.Errorf("cannot ensure organization for namespace %s: %w", namespace, err)
-		}
-
-		category, err := reporting.EnsureCategory(ctx, tx, &db.Category{Source: provider + ":" + namespace})
-		if err != nil {
-			return fmt.Errorf("cannot ensure category for namespace %s: %w", namespace, err)
-		}
-
-		dateTime := reporting.NewDateTime(s.BillingDate)
-		dateTime, err = reporting.EnsureDateTime(ctx, tx, dateTime)
-		if err != nil {
-			return fmt.Errorf("cannot ensure date time for namespace %s: %w", namespace, err)
-		}
-
-		product, err := reporting.GetBestMatchingProduct(ctx, tx, sourceString.getSourceString(), s.BillingDate)
-		if err != nil {
-			return fmt.Errorf("cannot get product best match for namespace %s: %w", namespace, err)
-		}
-
-		discount, err := reporting.GetBestMatchingDiscount(ctx, tx, sourceString.getSourceString(), s.BillingDate)
-		if err != nil {
-			return fmt.Errorf("cannot get discount best match for namespace %s: %w", namespace, err)
-		}
-
-		query, err := reporting.GetQueryByName(ctx, tx, sourceString.getQuery())
-		if err != nil {
-			return fmt.Errorf("cannot get query by name for namespace %s: %w", namespace, err)
-		}
-
-		value, err = adjustStorageSizeUnit(value)
-		if err != nil {
-			return fmt.Errorf("adjustStorageSizeUnit: %w", err)
-		}
-
-		storageFact := reporting.NewFact(dateTime, query, tenant, category, product, discount, value)
-		_, err = reporting.EnsureFact(ctx, tx, storageFact)
-		if err != nil {
-			return fmt.Errorf("cannot save fact for namespace %s: %w", namespace, err)
-		}
-		return nil
+	return store.WriteRecord(ctx, reporting.Record{
+		TenantSource:   organization,
+		CategorySource: provider + ":" + namespace,
+		BillingDate:    s.BillingDate,
+		ProductSource:  sourceString.getSourceString(),
+		DiscountSource: sourceString.getSourceString(),
+		QueryName:      sourceString.getQuery(),
+		Value:          value,
 	})
 }
 

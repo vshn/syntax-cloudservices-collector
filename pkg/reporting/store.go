@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/appuio/appuio-cloud-reporting/pkg/db"
 	"github.com/go-logr/logr"
 	"github.com/jmoiron/sqlx"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type Store struct {
@@ -95,4 +97,72 @@ func (r *Store) Initialize(ctx context.Context, products []*db.Product, discount
 		return fmt.Errorf("initialize: %w", err)
 	}
 	return nil
+}
+
+type Record struct {
+	TenantSource   string
+	CategorySource string
+	BillingDate    time.Time
+	ProductSource  string
+	DiscountSource string
+	QueryName      string
+	Value          float64
+}
+
+func (r *Store) WriteRecord(ctx context.Context, record Record) error {
+	return r.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+		tenant, err := EnsureTenant(ctx, tx, &db.Tenant{Source: record.TenantSource})
+		if err != nil {
+			return fmt.Errorf("EnsureTenant(%q): %w", record.TenantSource, err)
+		}
+
+		category, err := EnsureCategory(ctx, tx, &db.Category{Source: record.CategorySource})
+		if err != nil {
+			return fmt.Errorf("EnsureCategory(%q): %w", record.CategorySource, err)
+		}
+
+		dateTime, err := EnsureDateTime(ctx, tx, NewDateTime(record.BillingDate))
+		if err != nil {
+			return fmt.Errorf("EnsureDateTime(%q): %w", record.BillingDate, err)
+		}
+
+		product, err := GetBestMatchingProduct(ctx, tx, record.ProductSource, record.BillingDate)
+		if err != nil {
+			return fmt.Errorf("GetBestMatchingProduct(%q, %q): %w", record.ProductSource, record.BillingDate, err)
+		}
+
+		discount, err := GetBestMatchingDiscount(ctx, tx, record.DiscountSource, record.BillingDate)
+		if err != nil {
+			return fmt.Errorf("GetBestMatchingDiscount(%q, %q): %w", record.DiscountSource, record.BillingDate, err)
+		}
+
+		query, err := GetQueryByName(ctx, tx, record.QueryName)
+		if err != nil {
+			return fmt.Errorf("GetQueryByName(%q): %w", record.QueryName, err)
+		}
+
+		fact := NewFact(dateTime, query, tenant, category, product, discount, record.Value)
+		if !isFactUpdatable(ctx, tx, fact, record.Value) {
+			return nil
+		}
+
+		_, err = EnsureFact(ctx, tx, fact)
+		if err != nil {
+			return fmt.Errorf("EnsureFact: %w", err)
+		}
+		return nil
+	})
+}
+
+// isFactUpdatable makes sure that only missing data or higher quantity values are saved in the billing database
+func isFactUpdatable(ctx context.Context, tx *sqlx.Tx, f *db.Fact, value float64) bool {
+	logger := ctrl.LoggerFrom(ctx)
+
+	fact, _ := GetByFact(ctx, tx, f)
+	if fact == nil || fact.Quantity < value {
+		return true
+	}
+	logger.Info(fmt.Sprintf("Skipped saving, higher or equal number of instances is already recorded in the billing database "+
+		"for this hour: saved instance count %.0f, newer instance count %.0f", fact.Quantity, value))
+	return false
 }

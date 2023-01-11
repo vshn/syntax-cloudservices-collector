@@ -23,7 +23,8 @@ const (
 )
 
 func fetchNamespaceWithOrganizationMap(ctx context.Context, k8sClient k8s.Client) (map[string]string, error) {
-	log := ctrl.LoggerFrom(ctx)
+	logger := ctrl.LoggerFrom(ctx)
+
 	gvk := schema.GroupVersionKind{
 		Group:   "",
 		Version: "v1",
@@ -41,7 +42,7 @@ func fetchNamespaceWithOrganizationMap(ctx context.Context, k8sClient k8s.Client
 	for _, ns := range list.Items {
 		org, ok := ns.GetLabels()[organizationLabel]
 		if !ok {
-			log.Info("Organization label not found in namespace", "namespace", ns.GetName())
+			logger.Info("Organization label not found in namespace", "namespace", ns.GetName())
 			continue
 		}
 		namespaces[ns.GetName()] = org

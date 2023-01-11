@@ -8,6 +8,7 @@ import (
 
 	"github.com/appuio/appuio-cloud-reporting/pkg/db"
 	"github.com/jmoiron/sqlx"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 func fetchDiscount(ctx context.Context, tx *sqlx.Tx, source string) (*db.Discount, error) {
@@ -59,6 +60,8 @@ func GetBestMatchingDiscount(ctx context.Context, tx *sqlx.Tx, source string, ti
 }
 
 func EnsureDiscount(ctx context.Context, tx *sqlx.Tx, ensureDiscount *db.Discount) (*db.Discount, error) {
+	logger := ctrl.LoggerFrom(ctx)
+
 	discount, err := fetchDiscount(ctx, tx, ensureDiscount.Source)
 	if err != nil {
 		return nil, err
@@ -71,7 +74,7 @@ func EnsureDiscount(ctx context.Context, tx *sqlx.Tx, ensureDiscount *db.Discoun
 	} else {
 		ensureDiscount.Id = discount.Id
 		if !reflect.DeepEqual(discount, ensureDiscount) {
-			fmt.Printf("updating discount\n") // FIXME(mw): logger
+			logger.Info("updating discount", "id", discount.Id)
 			err = updateDiscount(tx, ensureDiscount)
 			if err != nil {
 				return nil, err

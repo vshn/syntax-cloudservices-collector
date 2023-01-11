@@ -7,6 +7,7 @@ import (
 
 	"github.com/appuio/appuio-cloud-reporting/pkg/db"
 	"github.com/jmoiron/sqlx"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 func GetByFact(ctx context.Context, tx *sqlx.Tx, fact *db.Fact) (*db.Fact, error) {
@@ -24,6 +25,8 @@ func GetByFact(ctx context.Context, tx *sqlx.Tx, fact *db.Fact) (*db.Fact, error
 }
 
 func EnsureFact(ctx context.Context, tx *sqlx.Tx, ensureFact *db.Fact) (*db.Fact, error) {
+	logger := ctrl.LoggerFrom(ctx)
+
 	fact, err := GetByFact(ctx, tx, ensureFact)
 	if err != nil {
 		return nil, err
@@ -36,7 +39,7 @@ func EnsureFact(ctx context.Context, tx *sqlx.Tx, ensureFact *db.Fact) (*db.Fact
 	} else {
 		ensureFact.Id = fact.Id
 		if !reflect.DeepEqual(fact, ensureFact) {
-			fmt.Printf("updating facts\n")
+			logger.Info("updating fact", "id", fact.Id)
 			err = updateFact(tx, ensureFact)
 			if err != nil {
 				return nil, err

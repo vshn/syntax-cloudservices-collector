@@ -8,6 +8,7 @@ import (
 
 	"github.com/appuio/appuio-cloud-reporting/pkg/db"
 	"github.com/jmoiron/sqlx"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 func getProductBySource(ctx context.Context, tx *sqlx.Tx, source string) (*db.Product, error) {
@@ -59,6 +60,8 @@ func GetBestMatchingProduct(ctx context.Context, tx *sqlx.Tx, source string, tim
 }
 
 func EnsureProduct(ctx context.Context, tx *sqlx.Tx, ensureProduct *db.Product) (*db.Product, error) {
+	logger := ctrl.LoggerFrom(ctx)
+
 	product, err := getProductBySource(ctx, tx, ensureProduct.Source)
 	if err != nil {
 		return nil, err
@@ -71,7 +74,7 @@ func EnsureProduct(ctx context.Context, tx *sqlx.Tx, ensureProduct *db.Product) 
 	} else {
 		ensureProduct.Id = product.Id
 		if !reflect.DeepEqual(product, ensureProduct) {
-			fmt.Printf("updating product\n") // FIXME(mw): logger
+			logger.Info("updating product", "id", product.Id)
 			err = updateProduct(tx, ensureProduct)
 			if err != nil {
 				return nil, err

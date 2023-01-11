@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/appuio/appuio-cloud-reporting/pkg/db"
 	"github.com/cloudscale-ch/cloudscale-go-sdk/v2"
-	"github.com/jmoiron/sqlx"
 	"github.com/vshn/exoscale-metrics-collector/pkg/reporting"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,76 +50,46 @@ func (obj *ObjectStorage) Execute(ctx context.Context) error {
 	if err := s.Initialize(ctx, ensureProducts, ensureDiscounts, ensureQueries); err != nil {
 		return fmt.Errorf("init: %w", err)
 	}
+	logger.Info("initialized reporting db")
 
-	return s.WithTransaction(ctx, func(tx *sqlx.Tx) error {
-		accumulated, err := accumulateBucketMetrics(ctx, obj.date, obj.client, obj.k8sClient)
+	accumulated, err := accumulateBucketMetrics(ctx, obj.date, obj.client, obj.k8sClient)
+	if err != nil {
+		return err
+	}
+	for source, value := range accumulated {
+		if value == 0 {
+			continue
+		}
+		logger.Info("accumulating source", "source", source)
+
+		quantity, err := convertUnit(units[source.Query], value)
 		if err != nil {
-			return err
+			return fmt.Errorf("convertUnit(%q, %v): %w", units[source.Query], value, err)
 		}
 
-		for source, value := range accumulated {
-			if value == 0 {
-				continue
-			}
-
-			logger.Info("accumulating source", "source", source)
-
-			tenant, err := reporting.EnsureTenant(ctx, tx, &db.Tenant{Source: source.Tenant})
-			if err != nil {
-				return err
-			}
-
-			category, err := reporting.EnsureCategory(ctx, tx, &db.Category{Source: source.Zone + ":" + source.Namespace})
-			if err != nil {
-				return err
-			}
-
-			dateTime := reporting.NewDateTime(source.Start)
-			dateTime, err = reporting.EnsureDateTime(ctx, tx, dateTime)
-			if err != nil {
-				return err
-			}
-
-			product, err := reporting.GetBestMatchingProduct(ctx, tx, source.String(), source.Start)
-			if err != nil {
-				return err
-			}
-
-			discount, err := reporting.GetBestMatchingDiscount(ctx, tx, source.String(), source.Start)
-			if err != nil {
-				return err
-			}
-
-			query, err := reporting.GetQueryByName(ctx, tx, source.Query+":"+source.Zone)
-			if err != nil {
-				return err
-			}
-
-			quantity, err := convertUnit(query, value)
-			if err != nil {
-				return fmt.Errorf("convertUnit(%q): %w", value, err)
-			}
-			storageFact := reporting.NewFact(dateTime, query, tenant, category, product, discount, quantity)
-			_, err = reporting.EnsureFact(ctx, tx, storageFact)
-			if err != nil {
-				return err
-			}
-
-			err = tx.Commit()
-			if err != nil {
-				return err
-			}
+		err = s.WriteRecord(ctx, reporting.Record{
+			TenantSource:   source.Tenant,
+			CategorySource: source.Zone + ":" + source.Namespace,
+			BillingDate:    source.Start,
+			ProductSource:  source.String(),
+			DiscountSource: source.String(),
+			QueryName:      source.Query + ":" + source.Zone,
+			Value:          quantity,
+		})
+		if err != nil {
+			return fmt.Errorf("WriteRecord(%q): %w", source, err)
 		}
-		return nil
-	})
+	}
+
+	return nil
 }
 
-func convertUnit(query *db.Query, value uint64) (float64, error) {
-	if query.Unit == "GB" || query.Unit == "GBDay" {
+func convertUnit(unit string, value uint64) (float64, error) {
+	if unit == "GB" || unit == "GBDay" {
 		return float64(value) / 1000 / 1000 / 1000, nil
 	}
-	if query.Unit == "KReq" {
+	if unit == "KReq" {
 		return float64(value) / 1000, nil
 	}
-	return 0, errors.New("Unknown query unit " + query.Unit)
+	return 0, errors.New("Unknown query unit " + unit)
 }

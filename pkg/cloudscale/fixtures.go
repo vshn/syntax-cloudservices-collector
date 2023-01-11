@@ -65,27 +65,33 @@ var (
 	}
 )
 
+var units = map[string]string{
+	sourceQueryStorage:    "GBDay",
+	sourceQueryTrafficOut: "GB",
+	sourceQueryRequests:   "KReq",
+}
+
 var (
 	ensureQueries = []*db.Query{
 		{
 			Name:        sourceQueryStorage + ":" + sourceZones[0],
 			Description: "Object Storage - Storage (cloudscale.ch)",
 			Query:       "",
-			Unit:        "GBDay",
+			Unit:        units[sourceQueryStorage],
 			During:      db.InfiniteRange(),
 		},
 		{
 			Name:        sourceQueryTrafficOut + ":" + sourceZones[0],
 			Description: "Object Storage - Traffic Out (cloudscale.ch)",
 			Query:       "",
-			Unit:        "GB",
+			Unit:        units[sourceQueryTrafficOut],
 			During:      db.InfiniteRange(),
 		},
 		{
 			Name:        sourceQueryRequests + ":" + sourceZones[0],
 			Description: "Object Storage - Requests (cloudscale.ch)",
 			Query:       "",
-			Unit:        "KReq",
+			Unit:        units[sourceQueryRequests],
 			During:      db.InfiniteRange(),
 		},
 	}

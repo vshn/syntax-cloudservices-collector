@@ -7,6 +7,7 @@ import (
 
 	"github.com/appuio/appuio-cloud-reporting/pkg/db"
 	"github.com/jmoiron/sqlx"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 func GetQueryByName(ctx context.Context, tx *sqlx.Tx, name string) (*db.Query, error) {
@@ -22,6 +23,8 @@ func GetQueryByName(ctx context.Context, tx *sqlx.Tx, name string) (*db.Query, e
 }
 
 func EnsureQuery(ctx context.Context, tx *sqlx.Tx, ensureQuery *db.Query) (*db.Query, error) {
+	logger := ctrl.LoggerFrom(ctx)
+
 	query, err := GetQueryByName(ctx, tx, ensureQuery.Name)
 	if err != nil {
 		return nil, err
@@ -34,7 +37,7 @@ func EnsureQuery(ctx context.Context, tx *sqlx.Tx, ensureQuery *db.Query) (*db.Q
 	} else {
 		ensureQuery.Id = query.Id
 		if !reflect.DeepEqual(query, ensureQuery) {
-			fmt.Printf("updating query\n") // FIXME(mw): logger
+			logger.Info("updating query", "id", query.Id)
 			err = updateQuery(tx, ensureQuery)
 			if err != nil {
 				return nil, err

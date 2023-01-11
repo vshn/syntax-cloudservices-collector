@@ -47,8 +47,7 @@ func NewObjectStorage(exoscaleClient *egoscale.Client, k8sClient k8s.Client, dat
 
 // Execute executes the main business logic for this application by gathering, matching and saving data to the database
 func (o *ObjectStorage) Execute(ctx context.Context) error {
-	log := ctrl.LoggerFrom(ctx)
-	log.Info("Running metrics collector by step")
+	logger := ctrl.LoggerFrom(ctx)
 
 	detail, err := o.fetchManagedBucketsAndNamespaces(ctx)
 	if err != nil {
@@ -59,7 +58,7 @@ func (o *ObjectStorage) Execute(ctx context.Context) error {
 		return fmt.Errorf("getBucketUsage: %w", err)
 	}
 	if len(aggregated) == 0 {
-		log.Info("no buckets to be saved to the database")
+		logger.Info("no buckets to be saved to the database")
 		return nil
 	}
 
@@ -73,8 +72,8 @@ func (o *ObjectStorage) Execute(ctx context.Context) error {
 // getBucketUsage gets bucket usage from Exoscale and matches them with the bucket from the cluster
 // If there are no buckets in Exoscale, the API will return an empty slice
 func (o *ObjectStorage) getBucketUsage(ctx context.Context, bucketDetails []BucketDetail) (map[db.Key]db.Aggregated, error) {
-	log := ctrl.LoggerFrom(ctx)
-	log.Info("Fetching bucket usage from Exoscale")
+	logger := ctrl.LoggerFrom(ctx)
+	logger.Info("Fetching bucket usage from Exoscale")
 	resp, err := o.exoscaleClient.ListSosBucketsUsageWithResponse(ctx)
 	if err != nil {
 		return nil, err
@@ -82,7 +81,7 @@ func (o *ObjectStorage) getBucketUsage(ctx context.Context, bucketDetails []Buck
 
 	aggregatedBuckets := getAggregatedBuckets(ctx, *resp.JSON200.SosBucketsUsage, bucketDetails)
 	if len(aggregatedBuckets) == 0 {
-		log.Info("There are no bucket usage to be saved in the database")
+		logger.Info("There are no bucket usage to be saved in the database")
 		return nil, nil
 	}
 
@@ -90,17 +89,17 @@ func (o *ObjectStorage) getBucketUsage(ctx context.Context, bucketDetails []Buck
 }
 
 func (o *ObjectStorage) fetchManagedBucketsAndNamespaces(ctx context.Context) ([]BucketDetail, error) {
-	log := ctrl.LoggerFrom(ctx)
-	log.Info("Fetching buckets and namespaces from cluster")
+	logger := ctrl.LoggerFrom(ctx)
+	logger.Info("Fetching buckets and namespaces from cluster")
 
 	buckets := exoscalev1.BucketList{}
-	log.V(1).Info("Listing buckets from cluster")
+	logger.V(1).Info("Listing buckets from cluster")
 	err := o.k8sClient.List(ctx, &buckets)
 	if err != nil {
 		return nil, fmt.Errorf("cannot list buckets: %w", err)
 	}
 
-	log.V(1).Info("Listing namespaces from cluster")
+	logger.V(1).Info("Listing namespaces from cluster")
 	namespaces, err := fetchNamespaceWithOrganizationMap(ctx, o.k8sClient)
 	if err != nil {
 		return nil, fmt.Errorf("cannot list namespaces: %w", err)
@@ -110,8 +109,8 @@ func (o *ObjectStorage) fetchManagedBucketsAndNamespaces(ctx context.Context) ([
 }
 
 func getAggregatedBuckets(ctx context.Context, sosBucketsUsage []oapi.SosBucketUsage, bucketDetails []BucketDetail) map[db.Key]db.Aggregated {
-	log := ctrl.LoggerFrom(ctx)
-	log.Info("Aggregating buckets by namespace")
+	logger := ctrl.LoggerFrom(ctx)
+	logger.Info("Aggregating buckets by namespace")
 
 	sosBucketsUsageMap := make(map[string]oapi.SosBucketUsage, len(sosBucketsUsage))
 	for _, usage := range sosBucketsUsage {
@@ -120,10 +119,10 @@ func getAggregatedBuckets(ctx context.Context, sosBucketsUsage []oapi.SosBucketU
 
 	aggregatedBuckets := make(map[db.Key]db.Aggregated)
 	for _, bucketDetail := range bucketDetails {
-		log.V(1).Info("Checking bucket", "bucket", bucketDetail.BucketName)
+		logger.V(1).Info("Checking bucket", "bucket", bucketDetail.BucketName)
 
 		if bucketUsage, exists := sosBucketsUsageMap[bucketDetail.BucketName]; exists {
-			log.V(1).Info("Found exoscale bucket usage", "bucket", bucketUsage.Name, "bucket size", bucketUsage.Name)
+			logger.V(1).Info("Found exoscale bucket usage", "bucket", bucketUsage.Name, "bucket size", bucketUsage.Name)
 			key := db.NewKey(bucketDetail.Namespace)
 			aggregatedBucket := aggregatedBuckets[key]
 			aggregatedBucket.Key = key
@@ -131,15 +130,15 @@ func getAggregatedBuckets(ctx context.Context, sosBucketsUsage []oapi.SosBucketU
 			aggregatedBucket.Value += float64(*bucketUsage.Size)
 			aggregatedBuckets[key] = aggregatedBucket
 		} else {
-			log.Info("Could not find any bucket on exoscale", "bucket", bucketDetail.BucketName)
+			logger.Info("Could not find any bucket on exoscale", "bucket", bucketDetail.BucketName)
 		}
 	}
 	return aggregatedBuckets
 }
 
 func addOrgAndNamespaceToBucket(ctx context.Context, buckets exoscalev1.BucketList, namespaces map[string]string) []BucketDetail {
-	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Gathering org and namespace from buckets")
+	logger := ctrl.LoggerFrom(ctx)
+	logger.V(1).Info("Gathering org and namespace from buckets")
 
 	bucketDetails := make([]BucketDetail, 0, 10)
 	for _, bucket := range buckets.Items {
@@ -150,7 +149,7 @@ func addOrgAndNamespaceToBucket(ctx context.Context, buckets exoscalev1.BucketLi
 			organization, ok := namespaces[namespace]
 			if !ok {
 				// cannot find namespace in namespace list
-				log.Info("Namespace not found in namespace list, skipping...",
+				logger.Info("Namespace not found in namespace list, skipping...",
 					"namespace", namespace,
 					"bucket", bucket.Name)
 				continue
@@ -159,12 +158,12 @@ func addOrgAndNamespaceToBucket(ctx context.Context, buckets exoscalev1.BucketLi
 			bucketDetail.Organization = organization
 		} else {
 			// cannot get namespace from bucket
-			log.Info("Namespace label is missing in bucket, skipping...",
+			logger.Info("Namespace label is missing in bucket, skipping...",
 				"label", namespaceLabel,
 				"bucket", bucket.Name)
 			continue
 		}
-		log.V(1).Info("Added namespace and organization to bucket",
+		logger.V(1).Info("Added namespace and organization to bucket",
 			"bucket", bucket.Name,
 			"namespace", bucketDetail.Namespace,
 			"organization", bucketDetail.Organization)

@@ -78,8 +78,7 @@ func NewDBaaSService(exoscaleClient *egoscale.Client, k8sClient k8s.Client, data
 
 // Execute executes the main business logic for this application by gathering, matching and saving data to the database
 func (s *Service) Execute(ctx context.Context) error {
-	log := ctrl.LoggerFrom(ctx)
-	log.Info("Running metrics collector by step")
+	logger := ctrl.LoggerFrom(ctx)
 
 	detail, err := s.fetchManagedDBaaSAndNamespaces(ctx)
 	if err != nil {
@@ -95,7 +94,7 @@ func (s *Service) Execute(ctx context.Context) error {
 
 	nrAggregatedInstances := len(aggregated)
 	if nrAggregatedInstances == 0 {
-		log.Info("there are no DBaaS instances to be saved in the database")
+		logger.Info("there are no DBaaS instances to be saved in the database")
 		return nil
 	}
 
@@ -107,9 +106,9 @@ func (s *Service) Execute(ctx context.Context) error {
 
 // fetchManagedDBaaSAndNamespaces fetches instances and namespaces from kubernetes cluster
 func (s *Service) fetchManagedDBaaSAndNamespaces(ctx context.Context) ([]Detail, error) {
-	log := ctrl.LoggerFrom(ctx)
+	logger := ctrl.LoggerFrom(ctx)
 
-	log.V(1).Info("Listing namespaces from cluster")
+	logger.V(1).Info("Listing namespaces from cluster")
 	namespaces, err := fetchNamespaceWithOrganizationMap(ctx, s.k8sClient)
 	if err != nil {
 		return nil, fmt.Errorf("cannot list namespaces: %w", err)
@@ -128,7 +127,7 @@ func (s *Service) fetchManagedDBaaSAndNamespaces(ctx context.Context) ([]Detail,
 		}
 
 		for _, item := range metaList.Items {
-			dbaasDetail := findDBaaSDetailInNamespacesMap(item, gvk, namespaces, log)
+			dbaasDetail := findDBaaSDetailInNamespacesMap(item, gvk, namespaces, logger)
 			if dbaasDetail == nil {
 				continue
 			}
@@ -171,14 +170,14 @@ func findDBaaSDetailInNamespacesMap(resource metav1.PartialObjectMetadata, gvk s
 
 // fetchDBaaSUsage gets DBaaS service usage from Exoscale
 func (s *Service) fetchDBaaSUsage(ctx context.Context) ([]*egoscale.DatabaseService, error) {
-	log := ctrl.LoggerFrom(ctx)
-	log.Info("Fetching DBaaS usage from Exoscale")
+	logger := ctrl.LoggerFrom(ctx)
+	logger.Info("Fetching DBaaS usage from Exoscale")
 
 	var databaseServices []*egoscale.DatabaseService
 	for _, zone := range Zones {
 		databaseServicesByZone, err := s.exoscaleClient.ListDatabaseServices(ctx, zone)
 		if err != nil {
-			log.V(1).Error(err, "Cannot get exoscale database services on zone", "zone", zone)
+			logger.V(1).Error(err, "Cannot get exoscale database services on zone", "zone", zone)
 			return nil, err
 		}
 		databaseServices = append(databaseServices, databaseServicesByZone...)
@@ -188,8 +187,8 @@ func (s *Service) fetchDBaaSUsage(ctx context.Context) ([]*egoscale.DatabaseServ
 
 // aggregateDBaaS aggregates DBaaS services by namespaces and plan
 func aggregateDBaaS(ctx context.Context, exoscaleDBaaS []*egoscale.DatabaseService, dbaasDetails []Detail) map[db.Key]db.Aggregated {
-	log := ctrl.LoggerFrom(ctx)
-	log.Info("Aggregating DBaaS instances by namespace and plan")
+	logger := ctrl.LoggerFrom(ctx)
+	logger.Info("Aggregating DBaaS instances by namespace and plan")
 
 	// The DBaaS names are unique across DB types in an Exoscale organization.
 	dbaasServiceUsageMap := make(map[string]egoscale.DatabaseService, len(exoscaleDBaaS))
@@ -199,11 +198,11 @@ func aggregateDBaaS(ctx context.Context, exoscaleDBaaS []*egoscale.DatabaseServi
 
 	aggregatedDBaasS := make(map[db.Key]db.Aggregated)
 	for _, dbaasDetail := range dbaasDetails {
-		log.V(1).Info("Checking DBaaS", "instance", dbaasDetail.DBName)
+		logger.V(1).Info("Checking DBaaS", "instance", dbaasDetail.DBName)
 
 		dbaasUsage, exists := dbaasServiceUsageMap[dbaasDetail.DBName]
 		if exists && dbaasDetail.Kind == groupVersionKinds[*dbaasUsage.Type].Kind {
-			log.V(1).Info("Found exoscale dbaas usage", "instance", dbaasUsage.Name, "instance created", dbaasUsage.CreatedAt)
+			logger.V(1).Info("Found exoscale dbaas usage", "instance", dbaasUsage.Name, "instance created", dbaasUsage.CreatedAt)
 			key := db.NewKey(dbaasDetail.Namespace, *dbaasUsage.Plan, *dbaasUsage.Type)
 			aggregated := aggregatedDBaasS[key]
 			aggregated.Key = key
@@ -211,7 +210,7 @@ func aggregateDBaaS(ctx context.Context, exoscaleDBaaS []*egoscale.DatabaseServi
 			aggregated.Value++
 			aggregatedDBaasS[key] = aggregated
 		} else {
-			log.Info("Could not find any DBaaS on exoscale", "instance", dbaasDetail.DBName)
+			logger.Info("Could not find any DBaaS on exoscale", "instance", dbaasDetail.DBName)
 		}
 	}
 

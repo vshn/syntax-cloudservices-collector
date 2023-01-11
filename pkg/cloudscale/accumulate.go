@@ -3,12 +3,12 @@ package cloudscale
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/cloudscale-ch/cloudscale-go-sdk/v2"
 	cloudscalev1 "github.com/vshn/provider-cloudscale/apis/cloudscale/v1"
 	corev1 "k8s.io/api/core/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -40,16 +40,24 @@ This method is "accumulating" data because it collects data from possibly multip
 AccumulateKey. This is because the billing system can't handle multiple ObjectsUsers per namespace.
 */
 func accumulateBucketMetrics(ctx context.Context, date time.Time, cloudscaleClient *cloudscale.Client, k8sclient client.Client) (map[AccumulateKey]uint64, error) {
+	logger := ctrl.LoggerFrom(ctx)
+
+	logger.V(1).Info("fetching bucket metrics from cloudscale", "date", date)
+
 	bucketMetricsRequest := cloudscale.BucketMetricsRequest{Start: date, End: date}
 	bucketMetrics, err := cloudscaleClient.Metrics.GetBucketMetrics(ctx, &bucketMetricsRequest)
 	if err != nil {
 		return nil, err
 	}
 
+	logger.V(1).Info("fetching namespaces")
+
 	nsTenants, err := fetchNamespaces(ctx, k8sclient)
 	if err != nil {
 		return nil, err
 	}
+
+	logger.V(1).Info("fetching buckets")
 
 	buckets, err := fetchBuckets(ctx, k8sclient)
 	if err != nil {
@@ -62,20 +70,20 @@ func accumulateBucketMetrics(ctx context.Context, date time.Time, cloudscaleClie
 		name := bucketMetricsData.Subject.BucketName
 		ns, ok := buckets[name]
 		if !ok {
-			fmt.Fprintf(os.Stderr, "WARNING: Cannot sync bucket, bucket resource %q not found\n", name)
+			logger.Info("unable to sync bucket, bucket not found", "bucket", name)
 			continue
 		}
 		tenant, ok := nsTenants[ns]
 		if !ok {
-			fmt.Fprintf(os.Stderr, "WARNING: Cannot sync bucket, namespace %q not found in map\n", ns)
+			logger.Info("unable to sync bucket, namespace not found", "namespace", ns)
 			continue
 		}
-
 		err = accumulateBucketMetricsForObjectsUser(accumulated, bucketMetricsData, tenant, ns)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "WARNING: Cannot sync bucket %s: %v\n", name, err)
+			logger.Error(err, "unable to sync bucket", "bucket", name, "namespace", ns)
 			continue
 		}
+		logger.V(1).Info("accumulated bucket metrics", "bucket", name, "namespace", ns, "tenant", tenant, "accumulated", accumulated)
 	}
 
 	return accumulated, nil
