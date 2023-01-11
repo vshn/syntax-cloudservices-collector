@@ -163,6 +163,6 @@ func isFactUpdatable(ctx context.Context, tx *sqlx.Tx, f *db.Fact, value float64
 		return true
 	}
 	logger.Info(fmt.Sprintf("Skipped saving, higher or equal number of instances is already recorded in the billing database "+
-		"for this hour: saved instance count %.0f, newer instance count %.0f", fact.Quantity, value))
+		"for this hour: saved instance count %v, newer instance count %v", fact.Quantity, value))
 	return false
 }

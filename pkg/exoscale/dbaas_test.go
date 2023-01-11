@@ -7,16 +7,16 @@ import (
 
 	egoscale "github.com/exoscale/egoscale/v2"
 	"github.com/stretchr/testify/assert"
-	db "github.com/vshn/exoscale-metrics-collector/pkg/dbaas"
+	"github.com/vshn/exoscale-metrics-collector/pkg/exofixtures"
 )
 
 func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 	ctx := context.Background()
 
-	key1 := db.NewKey("vshn-xyz", "hobbyist-2", string(db.PostgresDBaaSType))
-	key2 := db.NewKey("vshn-abc", "business-128", string(db.PostgresDBaaSType))
+	key1 := NewKey("vshn-xyz", "hobbyist-2", string(exofixtures.PostgresDBaaSType))
+	key2 := NewKey("vshn-abc", "business-128", string(exofixtures.PostgresDBaaSType))
 
-	expectedAggregatedDBaaS := map[db.Key]db.Aggregated{
+	expectedAggregatedDBaaS := map[Key]Aggregated{
 		key1: {
 			Key:          key1,
 			Organization: "org1",
@@ -32,7 +32,7 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 	tests := map[string]struct {
 		dbaasDetails            []Detail
 		exoscaleDBaaS           []*egoscale.DatabaseService
-		expectedAggregatedDBaaS map[db.Key]db.Aggregated
+		expectedAggregatedDBaaS map[Key]Aggregated
 	}{
 		"given DBaaS details and Exoscale DBaasS, we should get the ExpectedAggregatedDBaasS": {
 			dbaasDetails: []Detail{
@@ -52,12 +52,12 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 			exoscaleDBaaS: []*egoscale.DatabaseService{
 				{
 					Name: strToPointer("postgres-abc"),
-					Type: strToPointer(string(db.PostgresDBaaSType)),
+					Type: strToPointer(string(exofixtures.PostgresDBaaSType)),
 					Plan: strToPointer("hobbyist-2"),
 				},
 				{
 					Name: strToPointer("postgres-def"),
-					Type: strToPointer(string(db.PostgresDBaaSType)),
+					Type: strToPointer(string(exofixtures.PostgresDBaaSType)),
 					Plan: strToPointer("business-128"),
 				},
 			},
@@ -81,15 +81,15 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 			exoscaleDBaaS: []*egoscale.DatabaseService{
 				{
 					Name: strToPointer("postgres-123"),
-					Type: strToPointer(string(db.PostgresDBaaSType)),
+					Type: strToPointer(string(exofixtures.PostgresDBaaSType)),
 				},
 				{
 					Name: strToPointer("postgres-456"),
-					Type: strToPointer(string(db.PostgresDBaaSType)),
+					Type: strToPointer(string(exofixtures.PostgresDBaaSType)),
 				},
 			},
 
-			expectedAggregatedDBaaS: map[db.Key]db.Aggregated{},
+			expectedAggregatedDBaaS: map[Key]Aggregated{},
 		},
 	}
 

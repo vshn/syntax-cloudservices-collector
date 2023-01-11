@@ -1,4 +1,4 @@
-package dbaas
+package exofixtures
 
 import (
 	"database/sql"
@@ -10,7 +10,7 @@ import (
 const MysqlDBaaSType ObjectType = "mysql"
 
 // Available plans for MySQL
-var mysqlProductDBaaS = []ProductDBaaS{
+var mysqlProductDBaaS = []productDBaaS{
 	{Plan: "hobbyist-2", Target: "1412", Amount: 0.06683},
 	{Plan: "startup-4", Target: "1412", Amount: 0.15731},
 	{Plan: "startup-8", Target: "1412", Amount: 0.30889},
@@ -38,14 +38,14 @@ var mysqlProductDBaaS = []ProductDBaaS{
 func generateMysqlProducts() []*db.Product {
 	products := make([]*db.Product, 0, len(mysqlProductDBaaS))
 	for _, p := range mysqlProductDBaaS {
-		s := dbaasSourceString{
+		s := DBaaSSourceString{
 			Query:        queryDBaaSMysql,
 			Organization: "*",
 			Namespace:    "*",
 			Plan:         p.Plan,
 		}
 		product := db.Product{
-			Source: s.getSourceString(),
+			Source: s.GetSourceString(),
 			Target: sql.NullString{String: p.Target, Valid: true},
 			Amount: p.Amount,
 			Unit:   defaultUnitDBaaS,

@@ -1,4 +1,4 @@
-package dbaas
+package exofixtures
 
 import (
 	"database/sql"
@@ -10,7 +10,7 @@ import (
 const RedisDBaaSType ObjectType = "redis"
 
 // Available plans for Redis
-var redisProductDBaaS = []ProductDBaaS{
+var redisProductDBaaS = []productDBaaS{
 	{Plan: "hobbyist-2", Target: "1413", Amount: 0.06779},
 	{Plan: "startup-4", Target: "1413", Amount: 0.13357},
 	{Plan: "startup-8", Target: "1413", Amount: 0.25920},
@@ -39,14 +39,14 @@ var redisProductDBaaS = []ProductDBaaS{
 func generateRedisProducts() []*db.Product {
 	products := make([]*db.Product, 0, len(redisProductDBaaS))
 	for _, p := range redisProductDBaaS {
-		s := dbaasSourceString{
+		s := DBaaSSourceString{
 			Query:        queryDBaaSRedis,
 			Organization: "*",
 			Namespace:    "*",
 			Plan:         p.Plan,
 		}
 		product := db.Product{
-			Source: s.getSourceString(),
+			Source: s.GetSourceString(),
 			Target: sql.NullString{String: p.Target, Valid: true},
 			Amount: p.Amount,
 			Unit:   defaultUnitDBaaS,

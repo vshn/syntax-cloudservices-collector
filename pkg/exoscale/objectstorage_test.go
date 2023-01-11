@@ -8,7 +8,6 @@ import (
 
 	"github.com/exoscale/egoscale/v2/oapi"
 	"github.com/stretchr/testify/assert"
-	db "github.com/vshn/exoscale-metrics-collector/pkg/dbaas"
 	exoscalev1 "github.com/vshn/provider-exoscale/apis/exoscale/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -21,19 +20,19 @@ func TestObjectStorage_GetBillingDate(t *testing.T) {
 
 		o, err := NewObjectStorage(nil, nil, "")
 		assert.NoError(t, err)
-		assert.Equal(t, o.database.BillingDate, expected)
+		assert.Equal(t, o.billingDate, expected)
 	})
 }
 
 func TestObjectStorage_GetAggregated(t *testing.T) {
-	defaultKey := db.NewKey("default")
-	alphaKey := db.NewKey("alpha")
-	omegaKey := db.NewKey("omega")
+	defaultKey := NewKey("default")
+	alphaKey := NewKey("alpha")
+	omegaKey := NewKey("omega")
 
 	tests := map[string]struct {
 		givenSosBucketsUsage []oapi.SosBucketUsage
 		givenBucketDetails   []BucketDetail
-		expectedAggregated   map[db.Key]db.Aggregated
+		expectedAggregated   map[Key]Aggregated
 	}{
 		"GivenSosBucketsUsageAndBuckets_WhenMatch_ThenExpectAggregatedObjects": {
 			givenSosBucketsUsage: []oapi.SosBucketUsage{
@@ -50,7 +49,7 @@ func TestObjectStorage_GetAggregated(t *testing.T) {
 				createBucketDetail("bucket-test-4", "omega", "orgC"),
 				createBucketDetail("no-metrics-bucket", "beta", "orgD"),
 			},
-			expectedAggregated: map[db.Key]db.Aggregated{
+			expectedAggregated: map[Key]Aggregated{
 				defaultKey: createAggregated(defaultKey, "orgA", 1),
 				alphaKey:   createAggregated(alphaKey, "orgB", 13),
 				omegaKey:   createAggregated(omegaKey, "orgC", 0),
@@ -66,7 +65,7 @@ func TestObjectStorage_GetAggregated(t *testing.T) {
 				createBucketDetail("bucket-test-4", "alpha", "orgB"),
 				createBucketDetail("bucket-test-5", "alpha", "orgB"),
 			},
-			expectedAggregated: map[db.Key]db.Aggregated{},
+			expectedAggregated: map[Key]Aggregated{},
 		},
 		"GivenSosBucketsUsageAndBuckets_WhenSosBucketsUsageEmpty_ThenExpectNoAggregatedObjects": {
 			givenSosBucketsUsage: []oapi.SosBucketUsage{
@@ -74,7 +73,7 @@ func TestObjectStorage_GetAggregated(t *testing.T) {
 				createSosBucketUsage("bucket-test-2", 4),
 			},
 			givenBucketDetails: []BucketDetail{},
-			expectedAggregated: map[db.Key]db.Aggregated{},
+			expectedAggregated: map[Key]Aggregated{},
 		},
 		"GivenSosBucketsUsageAndBuckets_WhenNoBuckets_ThenExpectNoAggregatedObjects": {
 			givenSosBucketsUsage: []oapi.SosBucketUsage{},
@@ -82,7 +81,7 @@ func TestObjectStorage_GetAggregated(t *testing.T) {
 				createBucketDetail("bucket-test-3", "default", "orgA"),
 				createBucketDetail("bucket-test-4", "alpha", "orgB"),
 			},
-			expectedAggregated: map[db.Key]db.Aggregated{},
+			expectedAggregated: map[Key]Aggregated{},
 		},
 	}
 	for name, tc := range tests {
@@ -177,8 +176,8 @@ func createBucket(name, namespace, organization string) exoscalev1.Bucket {
 	}
 }
 
-func createAggregated(key db.Key, organization string, size float64) db.Aggregated {
-	return db.Aggregated{
+func createAggregated(key Key, organization string, size float64) Aggregated {
+	return Aggregated{
 		Key:          key,
 		Organization: organization,
 		Value:        size,

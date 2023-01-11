@@ -1,4 +1,4 @@
-package dbaas
+package exofixtures
 
 import (
 	"database/sql"
@@ -10,7 +10,7 @@ import (
 const OpensearchDBaaSType ObjectType = "opensearch"
 
 // Available plans for OpenSearch
-var opensearchProductDBaaS = []ProductDBaaS{
+var opensearchProductDBaaS = []productDBaaS{
 	{Plan: "hobbyist-2", Target: "1414", Amount: 0.07875},
 	{Plan: "startup-4", Target: "1414", Amount: 0.18937},
 	{Plan: "startup-8", Target: "1414", Amount: 0.37583},
@@ -35,14 +35,14 @@ var opensearchProductDBaaS = []ProductDBaaS{
 func generateOpensearchProducts() []*db.Product {
 	products := make([]*db.Product, 0, len(opensearchProductDBaaS))
 	for _, p := range opensearchProductDBaaS {
-		s := dbaasSourceString{
+		s := DBaaSSourceString{
 			Query:        queryDBaaSOpensearch,
 			Organization: "*",
 			Namespace:    "*",
 			Plan:         p.Plan,
 		}
 		product := db.Product{
-			Source: s.getSourceString(),
+			Source: s.GetSourceString(),
 			Target: sql.NullString{String: p.Target, Valid: true},
 			Amount: p.Amount,
 			Unit:   defaultUnitDBaaS,

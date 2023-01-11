@@ -47,24 +47,44 @@ func (obj *ObjectStorage) Execute(ctx context.Context) error {
 		}
 	}()
 
-	if err := s.Initialize(ctx, ensureProducts, ensureDiscounts, ensureQueries); err != nil {
-		return fmt.Errorf("init: %w", err)
+	if err := obj.initialize(ctx, s); err != nil {
+		return err
 	}
-	logger.Info("initialized reporting db")
-
-	accumulated, err := accumulateBucketMetrics(ctx, obj.date, obj.client, obj.k8sClient)
+	accumulated, err := obj.accumulate(ctx)
 	if err != nil {
 		return err
 	}
+	return obj.save(ctx, s, accumulated)
+}
+
+func (obj *ObjectStorage) initialize(ctx context.Context, s *reporting.Store) error {
+	logger := ctrl.LoggerFrom(ctx)
+	if err := s.Initialize(ctx, ensureProducts, ensureDiscounts, ensureQueries); err != nil {
+		return fmt.Errorf("initialize: %w", err)
+	}
+	logger.Info("initialized reporting db")
+	return nil
+}
+
+func (obj *ObjectStorage) accumulate(ctx context.Context) (map[AccumulateKey]uint64, error) {
+	return accumulateBucketMetrics(ctx, obj.date, obj.client, obj.k8sClient)
+}
+
+func (obj *ObjectStorage) save(ctx context.Context, s *reporting.Store, accumulated map[AccumulateKey]uint64) error {
+	logger := ctrl.LoggerFrom(ctx)
+
 	for source, value := range accumulated {
+		logger = logger.WithValues("source", source)
 		if value == 0 {
+			logger.V(1).Info("skipping zero valued entry")
 			continue
 		}
-		logger.Info("accumulating source", "source", source)
+		logger.Info("accumulating source")
 
 		quantity, err := convertUnit(units[source.Query], value)
 		if err != nil {
-			return fmt.Errorf("convertUnit(%q, %v): %w", units[source.Query], value, err)
+			logger.Error(err, "convertUnit failed, skip entry", "unit", units[source.Query], value)
+			continue
 		}
 
 		err = s.WriteRecord(ctx, reporting.Record{
@@ -77,7 +97,8 @@ func (obj *ObjectStorage) Execute(ctx context.Context) error {
 			Value:          quantity,
 		})
 		if err != nil {
-			return fmt.Errorf("WriteRecord(%q): %w", source, err)
+			logger.Error(err, "writeRecord failed, skip entry")
+			continue
 		}
 	}
 

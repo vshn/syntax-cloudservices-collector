@@ -1,4 +1,4 @@
-package dbaas
+package exofixtures
 
 import (
 	"database/sql"
@@ -10,7 +10,7 @@ import (
 const PostgresDBaaSType ObjectType = "postgres"
 
 // Available plans for PostgreSQL
-var postgresProductDBaaS = []ProductDBaaS{
+var postgresProductDBaaS = []productDBaaS{
 	{Plan: "hobbyist-2", Target: "1411", Amount: 0.06683},
 	{Plan: "startup-4", Target: "1411", Amount: 0.15731},
 	{Plan: "startup-8", Target: "1411", Amount: 0.30889},
@@ -38,14 +38,14 @@ var postgresProductDBaaS = []ProductDBaaS{
 func generatePostgresProducts() []*db.Product {
 	products := make([]*db.Product, 0, len(postgresProductDBaaS))
 	for _, p := range postgresProductDBaaS {
-		s := dbaasSourceString{
+		s := DBaaSSourceString{
 			Query:        queryDBaaSPostgres,
 			Organization: "*",
 			Namespace:    "*",
 			Plan:         p.Plan,
 		}
 		product := db.Product{
-			Source: s.getSourceString(),
+			Source: s.GetSourceString(),
 			Target: sql.NullString{String: p.Target, Valid: true},
 			Amount: p.Amount,
 			Unit:   defaultUnitDBaaS,

@@ -121,7 +121,7 @@ func ExoscaleCmds() *cli.Command {
 						return fmt.Errorf("k8s client: %w", err)
 					}
 
-					o, err := exoscale.NewDBaaSService(exoscaleClient, k8sClient, dbURL)
+					o, err := exoscale.NewDBaaS(exoscaleClient, k8sClient, dbURL)
 					if err != nil {
 						return fmt.Errorf("dbaas service: %w", err)
 					}

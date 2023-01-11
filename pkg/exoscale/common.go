@@ -2,7 +2,9 @@ package exoscale
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -21,6 +23,47 @@ const (
 	// timeZone represents the time zone for billingHour
 	timeZone = "UTC"
 )
+
+// Aggregated contains information needed to save the metrics of the different resource types in the database
+type Aggregated struct {
+	Key
+	Organization string
+	// Value represents the aggregate amount by Key of used service
+	Value float64
+}
+
+// Key is the base64 key
+type Key string
+
+// NewKey creates new Key with slice of strings as inputs
+func NewKey(tokens ...string) Key {
+	return Key(base64.StdEncoding.EncodeToString([]byte(strings.Join(tokens, ";"))))
+}
+
+func (k *Key) String() string {
+	if k == nil {
+		return ""
+	}
+	tokens, err := k.DecodeKey()
+	if err != nil {
+		return ""
+	}
+
+	return fmt.Sprintf("Decoded key with tokens: %v", tokens)
+}
+
+// DecodeKey decodes Key with slice of strings as output
+func (k *Key) DecodeKey() (tokens []string, err error) {
+	if k == nil {
+		return []string{}, fmt.Errorf("key not initialized")
+	}
+	decodedKey, err := base64.StdEncoding.DecodeString(string(*k))
+	if err != nil {
+		return []string{}, fmt.Errorf("cannot decode key %s: %w", k, err)
+	}
+	s := strings.Split(string(decodedKey), ";")
+	return s, nil
+}
 
 func fetchNamespaceWithOrganizationMap(ctx context.Context, k8sClient k8s.Client) (map[string]string, error) {
 	logger := ctrl.LoggerFrom(ctx)

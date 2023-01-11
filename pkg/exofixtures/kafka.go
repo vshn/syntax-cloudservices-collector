@@ -1,4 +1,4 @@
-package dbaas
+package exofixtures
 
 import (
 	"database/sql"
@@ -10,7 +10,7 @@ import (
 const KafkaDBaaSType ObjectType = "kafka"
 
 // Available plans for Kafka
-var kafkaProductDBaaS = []ProductDBaaS{
+var kafkaProductDBaaS = []productDBaaS{
 	{Plan: "startup-2", Target: "1416", Amount: 0.34305},
 	{Plan: "business-4", Target: "1416", Amount: 0.85131},
 	{Plan: "business-8", Target: "1416", Amount: 1.64491},
@@ -33,14 +33,14 @@ var kafkaProductDBaaS = []ProductDBaaS{
 func generateKafkaProducts() []*db.Product {
 	products := make([]*db.Product, 0, len(kafkaProductDBaaS))
 	for _, p := range kafkaProductDBaaS {
-		s := dbaasSourceString{
+		s := DBaaSSourceString{
 			Query:        queryDBaaSKafka,
 			Organization: "*",
 			Namespace:    "*",
 			Plan:         p.Plan,
 		}
 		product := db.Product{
-			Source: s.getSourceString(),
+			Source: s.GetSourceString(),
 			Target: sql.NullString{String: p.Target, Valid: true},
 			Amount: p.Amount,
 			Unit:   defaultUnitDBaaS,
