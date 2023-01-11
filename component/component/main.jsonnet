@@ -103,8 +103,8 @@ assert params.exoscale.enabled != params.cloudscale.enabled : 'only one of the c
   assert secrets.credentials.stringData != null : 'secrets.credentials.stringData must be set.',
   assert secrets.credentials.stringData.EXOSCALE_API_KEY != null : 'secrets.credentials.stringData.EXOSCALE_API_KEY must be set.',
   assert secrets.credentials.stringData.EXOSCALE_API_SECRET != null : 'secrets.credentials.stringData.EXOSCALE_API_SECRET must be set.',
-  assert secrets.credentials.stringData.K8S_SERVER_URL != null : 'secrets.credentials.stringData.K8S_SERVER_URL must be set.',
-  assert secrets.credentials.stringData.K8S_TOKEN != null : 'secrets.credentials.stringData.K8S_TOKEN must be set.',
+  assert secrets.credentials.stringData.KUBERNETES_SERVER_URL != null : 'secrets.credentials.stringData.KUBERNETES_SERVER_URL must be set.',
+  assert secrets.credentials.stringData.KUBERNETES_SERVER_TOKEN != null : 'secrets.credentials.stringData.KUBERNETES_SERVER_TOKEN must be set.',
 
   secrets: std.filter(function(it) it != null, secret('exoscale')),
   objectStorageCronjob: cronjob(alias + '-objectstorage', 'exoscale objectstorage', params.exoscale.objectStorage.schedule),

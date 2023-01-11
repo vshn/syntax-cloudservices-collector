@@ -81,7 +81,7 @@ The Exoscale API secret.
 Second part of the Exoscale API credentials.
 See EXOSCALE_API_KEY for instructions.
 
-=== `secrets.exoscale.credentials.stringData.K8S_SERVER_URL`
+=== `secrets.exoscale.credentials.stringData.KUBERNETES_SERVER_URL`
 
 [horizontal]
 type:: string
@@ -89,7 +89,7 @@ default:: Required.
 
 The Kubernetes server URL.
 
-=== `secrets.exoscale.credentials.stringData.K8S_TOKEN`
+=== `secrets.exoscale.credentials.stringData.KUBERNETES_SERVER_TOKEN`
 
 [horizontal]
 type:: string

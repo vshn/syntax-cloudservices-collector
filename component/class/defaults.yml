@@ -9,8 +9,8 @@ parameters:
           stringData:
             EXOSCALE_API_KEY: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/${_instance}/exoscale-key}"
             EXOSCALE_API_SECRET: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/${_instance}/exoscale-secret}"
-            K8S_SERVER_URL: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/${_instance}/cluster-server}"
-            K8S_TOKEN: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/${_instance}/cluster-token}"
+            KUBERNETES_SERVER_URL: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/${_instance}/cluster-server}"
+            KUBERNETES_SERVER_TOKEN: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/${_instance}/cluster-token}"
       cloudscale:
         credentials:
           stringData:

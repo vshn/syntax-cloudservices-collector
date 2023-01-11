@@ -17,12 +17,12 @@ func addCommandName(c *cli.Context) error {
 
 func ExoscaleCmds() *cli.Command {
 	var (
-		secret         string
-		accessKey      string
-		dbURL          string
-		k8sServerToken string
-		k8sServerURL   string
-		kubeconfig     string
+		secret                string
+		accessKey             string
+		dbURL                 string
+		kubernetesServerToken string
+		kubernetesServerURL   string
+		kubeconfig            string
 	)
 	return &cli.Command{
 		Name:  "exoscale",
@@ -46,27 +46,24 @@ func ExoscaleCmds() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:        "database-url",
-				Aliases:     []string{"d"},
 				EnvVars:     []string{"ACR_DB_URL"},
 				Required:    true,
 				Usage:       "A PostgreSQL database URL where to save relevant metrics",
 				Destination: &dbURL,
 			},
 			&cli.StringFlag{
-				Name:        "k8s-server-token",
-				Aliases:     []string{"t"},
-				EnvVars:     []string{"K8S_TOKEN"},
-				Required:    true,
-				Usage:       "A Kubernetes server token which can view buckets.exoscale.crossplane.io resources",
-				Destination: &k8sServerToken,
-			},
-			&cli.StringFlag{
-				Name:        "k8s-server-url",
-				Aliases:     []string{"u"},
-				EnvVars:     []string{"K8S_SERVER_URL"},
+				Name:        "kubernetes-server-url",
+				EnvVars:     []string{"KUBERNETES_SERVER_URL"},
 				Required:    true,
 				Usage:       "A Kubernetes server URL from where to get the data from",
-				Destination: &k8sServerURL,
+				Destination: &kubernetesServerURL,
+			},
+			&cli.StringFlag{
+				Name:        "kubernetes-server-token",
+				EnvVars:     []string{"KUBERNETES_SERVER_TOKEN"},
+				Required:    true,
+				Usage:       "A Kubernetes server token which can view buckets.cloudscale.crossplane.io resources",
+				Destination: &kubernetesServerToken,
 			},
 			&cli.StringFlag{
 				Name:        "kubeconfig",
@@ -92,7 +89,7 @@ func ExoscaleCmds() *cli.Command {
 					}
 
 					logger.Info("Creating k8s client")
-					k8sClient, err := kubernetes.NewClient(kubeconfig, k8sServerURL, k8sServerToken)
+					k8sClient, err := kubernetes.NewClient(kubeconfig, kubernetesServerURL, kubernetesServerToken)
 					if err != nil {
 						return fmt.Errorf("k8s client: %w", err)
 					}
@@ -119,7 +116,7 @@ func ExoscaleCmds() *cli.Command {
 					}
 
 					logger.Info("Creating k8s client")
-					k8sClient, err := kubernetes.NewClient(kubeconfig, k8sServerURL, k8sServerToken)
+					k8sClient, err := kubernetes.NewClient(kubeconfig, kubernetesServerURL, kubernetesServerToken)
 					if err != nil {
 						return fmt.Errorf("k8s client: %w", err)
 					}
