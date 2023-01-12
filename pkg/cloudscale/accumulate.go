@@ -32,6 +32,11 @@ func (k AccumulateKey) String() string {
 	return k.Query + ":" + k.Zone + ":" + k.Tenant + ":" + k.Namespace
 }
 
+// MarshalText implements encoding.TextMarshaler to be able to e.g. log the map with this key type.
+func (k AccumulateKey) MarshalText() ([]byte, error) {
+	return []byte(k.String()), nil
+}
+
 /*
 accumulateBucketMetrics gets all the bucket metrics from cloudscale and puts them into a map. The map key is the "AccumulateKey",
 and the value is the raw value of the data returned by cloudscale (e.g. bytes, requests). In order to construct the

@@ -8,7 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func fetchCategory(ctx context.Context, tx *sqlx.Tx, source string) (*db.Category, error) {
+func GetCategory(ctx context.Context, tx *sqlx.Tx, source string) (*db.Category, error) {
 	var categories []db.Category
 	err := sqlx.SelectContext(ctx, tx, &categories, `SELECT categories.* FROM categories WHERE source = $1`, source)
 	if err != nil {
@@ -21,7 +21,7 @@ func fetchCategory(ctx context.Context, tx *sqlx.Tx, source string) (*db.Categor
 }
 
 func EnsureCategory(ctx context.Context, tx *sqlx.Tx, cat *db.Category) (*db.Category, error) {
-	category, err := fetchCategory(ctx, tx, cat.Source)
+	category, err := GetCategory(ctx, tx, cat.Source)
 	if err != nil {
 		return nil, err
 	}

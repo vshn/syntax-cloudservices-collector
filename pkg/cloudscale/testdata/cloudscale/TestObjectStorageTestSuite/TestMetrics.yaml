@@ -1,0 +1,149 @@
+---
+version: 2
+interactions:
+    - id: 0
+      request:
+        proto: HTTP/1.1
+        proto_major: 1
+        proto_minor: 1
+        content_length: 0
+        transfer_encoding: []
+        trailer: {}
+        host: api.cloudscale.ch
+        remote_addr: ""
+        request_uri: ""
+        body: ""
+        form: {}
+        headers:
+            Accept:
+                - application/json
+            Content-Type:
+                - application/json
+            User-Agent:
+                - cloudscale/v2.0.1
+        url: https://api.cloudscale.ch/v1/metrics/buckets?start=2023-01-11&end=2023-01-11
+        method: GET
+      response:
+        proto: HTTP/2.0
+        proto_major: 2
+        proto_minor: 0
+        transfer_encoding: []
+        trailer: {}
+        content_length: 12544
+        uncompressed: false
+        body: |
+            {
+              "start": "2023-01-10T23:00:00Z",
+              "end": "2023-01-11T23:00:00Z",
+              "data": [
+                {
+                  "subject": {
+                    "name": "example-project-a",
+                    "objects_user_id": "a"
+                  },
+                  "time_series": [
+                    {
+                      "start": "2023-01-10T23:00:00Z",
+                      "end": "2023-01-11T23:00:00Z",
+                      "usage": {
+                        "requests": 100000,
+                        "object_count": 1000000,
+                        "storage_bytes": 1000000000000,
+                        "received_bytes": 0,
+                        "sent_bytes": 50000000000
+                      }
+                    }
+                  ]
+                },
+                {
+                  "subject": {
+                    "name": "example-project-b",
+                    "objects_user_id": "b"
+                  },
+                  "time_series": [
+                    {
+                      "start": "2023-01-10T23:00:00Z",
+                      "end": "2023-01-11T23:00:00Z",
+                      "usage": {
+                        "requests": 1,
+                        "object_count": 1,
+                        "storage_bytes": 4096,
+                        "received_bytes": 0,
+                        "sent_bytes": 0
+                      }
+                    }
+                  ]
+                },
+                {
+                  "subject": {
+                    "name": "next-big-thing-a",
+                    "objects_user_id": "c"
+                  },
+                  "time_series": [
+                    {
+                      "start": "2023-01-10T23:00:00Z",
+                      "end": "2023-01-11T23:00:00Z",
+                      "usage": {
+                        "requests": 1,
+                        "object_count": 0,
+                        "storage_bytes": 0,
+                        "received_bytes": 0,
+                        "sent_bytes": 0
+                      }
+                    }
+                  ]
+                },
+                {
+                  "subject": {
+                    "name": "not-mapped",
+                    "objects_user_id": "d"
+                  },
+                  "time_series": [
+                    {
+                      "start": "2023-01-10T23:00:00Z",
+                      "end": "2023-01-11T23:00:00Z",
+                      "usage": {
+                        "requests": 0,
+                        "object_count": 1,
+                        "storage_bytes": 463405056,
+                        "received_bytes": 0,
+                        "sent_bytes": 0
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+        headers:
+            Access-Control-Allow-Headers:
+                - Content-Type, Authorization
+            Access-Control-Allow-Methods:
+                - GET, POST, OPTIONS, PUT, PATCH, DELETE
+            Access-Control-Allow-Origin:
+                - '*'
+            Allow:
+                - GET, HEAD, OPTIONS
+            Content-Language:
+                - en
+            Content-Type:
+                - application/json
+            Date:
+                - Thu, 12 Jan 2023 13:24:42 GMT
+            Referrer-Policy:
+                - same-origin
+            Server:
+                - nginx
+            Strict-Transport-Security:
+                - max-age=15768000; includeSubDomains
+            Vary:
+                - Accept-Encoding
+                - Accept-Language, Cookie
+            X-Content-Type-Options:
+                - nosniff
+            X-Frame-Options:
+                - DENY
+            X-Xss-Protection:
+                - 1; mode=block
+        status: 200 OK
+        code: 200
+        duration: 49.629723356s

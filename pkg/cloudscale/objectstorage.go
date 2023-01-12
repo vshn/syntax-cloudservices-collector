@@ -20,12 +20,10 @@ type ObjectStorage struct {
 }
 
 func NewObjectStorage(client *cloudscale.Client, k8sClient client.Client, days int, databaseURL string) (*ObjectStorage, error) {
-	location, err := time.LoadLocation("Europe/Zurich")
+	date, err := billingDate(days)
 	if err != nil {
-		return nil, fmt.Errorf("load loaction: %w", err)
+		return nil, err
 	}
-	now := time.Now().In(location)
-	date := time.Date(now.Year(), now.Month(), now.Day()-days, 0, 0, 0, 0, now.Location())
 
 	return &ObjectStorage{
 		client:      client,
@@ -33,6 +31,15 @@ func NewObjectStorage(client *cloudscale.Client, k8sClient client.Client, days i
 		date:        date,
 		databaseURL: databaseURL,
 	}, nil
+}
+
+func billingDate(days int) (time.Time, error) {
+	location, err := time.LoadLocation("Europe/Zurich")
+	if err != nil {
+		return time.Time{}, fmt.Errorf("load loaction: %w", err)
+	}
+	now := time.Now().In(location)
+	return time.Date(now.Year(), now.Month(), now.Day()-days, 0, 0, 0, 0, now.Location()), nil
 }
 
 func (obj *ObjectStorage) Execute(ctx context.Context) error {
@@ -74,7 +81,7 @@ func (obj *ObjectStorage) save(ctx context.Context, s *reporting.Store, accumula
 	logger := ctrl.LoggerFrom(ctx)
 
 	for source, value := range accumulated {
-		logger = logger.WithValues("source", source)
+		logger := logger.WithValues("source", source)
 		if value == 0 {
 			logger.V(1).Info("skipping zero valued entry")
 			continue

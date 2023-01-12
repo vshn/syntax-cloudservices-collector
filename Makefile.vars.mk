@@ -7,7 +7,8 @@ PROJECT_OWNER ?= vshn
 ## BUILD:go
 BIN_FILENAME ?= $(PROJECT_NAME)
 
-go_bin ?= $(PWD)/.work/bin
+work_dir ?= $(PWD)/.work
+go_bin ?= $(work_dir)/bin
 $(go_bin):
 	@mkdir -p $@
 

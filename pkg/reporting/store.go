@@ -162,7 +162,7 @@ func isFactUpdatable(ctx context.Context, tx *sqlx.Tx, f *db.Fact, value float64
 	if fact == nil || fact.Quantity < value {
 		return true
 	}
-	logger.Info(fmt.Sprintf("Skipped saving, higher or equal number of instances is already recorded in the billing database "+
-		"for this hour: saved instance count %v, newer instance count %v", fact.Quantity, value))
+	logger.Info(fmt.Sprintf("skipped saving, higher or equal number already recorded in DB "+
+		"for this hour: saved: \"%v\", new: \"%v\"", fact.Quantity, value))
 	return false
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func getTenantBySource(ctx context.Context, tx *sqlx.Tx, source string) (*db.Tenant, error) {
+func GetTenantBySource(ctx context.Context, tx *sqlx.Tx, source string) (*db.Tenant, error) {
 	var tenants []db.Tenant
 	err := sqlx.SelectContext(ctx, tx, &tenants, `SELECT tenants.* FROM tenants WHERE source = $1 limit 1`, source)
 	if err != nil {
@@ -21,7 +21,7 @@ func getTenantBySource(ctx context.Context, tx *sqlx.Tx, source string) (*db.Ten
 }
 
 func EnsureTenant(ctx context.Context, tx *sqlx.Tx, ensureTenant *db.Tenant) (*db.Tenant, error) {
-	tenant, err := getTenantBySource(ctx, tx, ensureTenant.Source)
+	tenant, err := GetTenantBySource(ctx, tx, ensureTenant.Source)
 	if err != nil {
 		return nil, err
 	}

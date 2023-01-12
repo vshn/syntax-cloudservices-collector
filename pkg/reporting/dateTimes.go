@@ -9,7 +9,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func fetchDateTime(ctx context.Context, tx *sqlx.Tx, timestamp time.Time) (*db.DateTime, error) {
+func GetDateTime(ctx context.Context, tx *sqlx.Tx, timestamp time.Time) (*db.DateTime, error) {
 	var dateTimes []db.DateTime
 	err := sqlx.SelectContext(ctx, tx, &dateTimes, `SELECT date_times.* FROM date_times WHERE timestamp = $1`, timestamp)
 	if err != nil {
@@ -22,7 +22,7 @@ func fetchDateTime(ctx context.Context, tx *sqlx.Tx, timestamp time.Time) (*db.D
 }
 
 func EnsureDateTime(ctx context.Context, tx *sqlx.Tx, dt *db.DateTime) (*db.DateTime, error) {
-	dateTime, err := fetchDateTime(ctx, tx, dt.Timestamp)
+	dateTime, err := GetDateTime(ctx, tx, dt.Timestamp)
 	if err != nil {
 		return nil, err
 	}
