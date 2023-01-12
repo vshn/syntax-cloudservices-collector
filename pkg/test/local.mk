@@ -9,6 +9,7 @@ ACR_DB_URL ?= "postgres://reporting:reporting@localhost/appuio-cloud-reporting-t
 acr_clone_target ?= $(work_dir)/appuio-cloud-reporting
 
 CLOUDSCALE_CRDS_PATH ?= $(shell go list -f '{{.Dir}}' -m github.com/vshn/provider-cloudscale)/package/crds
+EXOSCALE_CRDS_PATH ?= $(shell go list -f '{{.Dir}}' -m github.com/vshn/provider-exoscale)/package/crds
 
 # Prepare binary
 $(setup_envtest_bin): export GOBIN = $(go_bin)
@@ -22,6 +23,7 @@ test-integration: $(setup_envtest_bin) start-acr ## Run integration tests agains
 	export KUBEBUILDER_ASSETS="$$($(setup_envtest_bin) $(ENVTEST_ADDITIONAL_FLAGS) use -i -p path '$(ENVTEST_K8S_VERSION)!')" && \
 	export ACR_DB_URL="$(ACR_DB_URL)" && \
 	export CLOUDSCALE_CRDS_PATH="$(CLOUDSCALE_CRDS_PATH)" && \
+	export EXOSCALE_CRDS_PATH="$(EXOSCALE_CRDS_PATH)" && \
 	go test -tags=integration -coverprofile cover.out -covermode atomic ./...
 
 .PHONY: .envtest-clean

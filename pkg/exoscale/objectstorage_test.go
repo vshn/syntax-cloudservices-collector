@@ -12,18 +12,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestObjectStorage_GetBillingDate(t *testing.T) {
-	t.Run("GivenContext_WhenGetBillingDate_ThenReturnYesterdayDate", func(t *testing.T) {
-		utc, _ := time.LoadLocation("UTC")
-		now := time.Now().In(utc)
-		expected := time.Date(now.Year(), now.Month(), time.Now().Day()-1, 6, 0, 0, 0, now.Location())
-
-		o, err := NewObjectStorage(nil, nil, "")
-		assert.NoError(t, err)
-		assert.Equal(t, o.billingDate, expected)
-	})
-}
-
 func TestObjectStorage_GetAggregated(t *testing.T) {
 	defaultKey := NewKey("default")
 	alphaKey := NewKey("alpha")

@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/cloudscale-ch/cloudscale-go-sdk/v2"
 	"github.com/urfave/cli/v2"
@@ -87,7 +88,14 @@ func CloudscaleCmds() *cli.Command {
 						return fmt.Errorf("k8s client: %w", err)
 					}
 
-					o, err := cs.NewObjectStorage(cloudscaleClient, k8sClient, days, dbURL)
+					location, err := time.LoadLocation("Europe/Zurich")
+					if err != nil {
+						return fmt.Errorf("load loaction: %w", err)
+					}
+					now := time.Now().In(location)
+					billingDate := time.Date(now.Year(), now.Month(), now.Day()-days, 0, 0, 0, 0, now.Location())
+
+					o, err := cs.NewObjectStorage(cloudscaleClient, k8sClient, dbURL, billingDate)
 					if err != nil {
 						return fmt.Errorf("object storage: %w", err)
 					}

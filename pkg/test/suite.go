@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -16,6 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap/zaptest"
+	"gopkg.in/dnaeon/go-vcr.v3/cassette"
+	"gopkg.in/dnaeon/go-vcr.v3/recorder"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -97,6 +100,33 @@ func (ts *Suite) SetupEnv(crdPaths []string) {
 	ts.Env = testEnv
 	ts.Config = config
 	ts.Client = k8sClient
+}
+
+func (ts *Suite) RequestRecorder(path string) (*http.Client, func(), error) {
+	ts.T().Helper()
+
+	r, err := recorder.NewWithOptions(&recorder.Options{
+		CassetteName:       path,
+		Mode:               recorder.ModeRecordOnce,
+		RealTransport:      nil,
+		SkipRequestLatency: true,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("recorder: %w", err)
+	}
+	cancel := func() {
+		if err := r.Stop(); err != nil {
+			ts.T().Logf("recorder stop: %v", err)
+		}
+	}
+
+	r.AddHook(func(i *cassette.Interaction) error {
+		// ensure API token is not stored in recorded response
+		delete(i.Request.Headers, "Authorization")
+		return nil
+	}, recorder.AfterCaptureHook)
+
+	return r.GetDefaultClient(), cancel, nil
 }
 
 // RegisterScheme passes the current scheme to the given SchemeBuilder func.

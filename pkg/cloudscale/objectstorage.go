@@ -19,27 +19,13 @@ type ObjectStorage struct {
 	databaseURL string
 }
 
-func NewObjectStorage(client *cloudscale.Client, k8sClient client.Client, days int, databaseURL string) (*ObjectStorage, error) {
-	date, err := billingDate(days)
-	if err != nil {
-		return nil, err
-	}
-
+func NewObjectStorage(client *cloudscale.Client, k8sClient client.Client, databaseURL string, billingDate time.Time) (*ObjectStorage, error) {
 	return &ObjectStorage{
 		client:      client,
 		k8sClient:   k8sClient,
-		date:        date,
+		date:        billingDate,
 		databaseURL: databaseURL,
 	}, nil
-}
-
-func billingDate(days int) (time.Time, error) {
-	location, err := time.LoadLocation("Europe/Zurich")
-	if err != nil {
-		return time.Time{}, fmt.Errorf("load loaction: %w", err)
-	}
-	now := time.Now().In(location)
-	return time.Date(now.Year(), now.Month(), now.Day()-days, 0, 0, 0, 0, now.Location()), nil
 }
 
 func (obj *ObjectStorage) Execute(ctx context.Context) error {

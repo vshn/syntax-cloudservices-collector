@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/urfave/cli/v2"
 	"github.com/vshn/exoscale-metrics-collector/pkg/exoscale"
@@ -9,6 +10,9 @@ import (
 	"github.com/vshn/exoscale-metrics-collector/pkg/log"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
+
+// billingHour represents the hour when metrics are collected
+const billingHour = 6
 
 func addCommandName(c *cli.Context) error {
 	c.Context = log.NewLoggingContext(c.Context, log.Logger(c.Context).WithName(c.Command.Name))
@@ -83,7 +87,7 @@ func ExoscaleCmds() *cli.Command {
 					ctrl.SetLogger(logger)
 
 					logger.Info("Creating Exoscale client")
-					exoscaleClient, err := exoscale.InitClient(accessKey, secret)
+					exoscaleClient, err := exoscale.NewClient(accessKey, secret)
 					if err != nil {
 						return fmt.Errorf("exoscale client: %w", err)
 					}
@@ -94,7 +98,11 @@ func ExoscaleCmds() *cli.Command {
 						return fmt.Errorf("k8s client: %w", err)
 					}
 
-					o, err := exoscale.NewObjectStorage(exoscaleClient, k8sClient, dbURL)
+					now := time.Now().In(time.UTC)
+					previousDay := now.Day() - 1
+					billingDate := time.Date(now.Year(), now.Month(), previousDay, billingHour, 0, 0, 0, now.Location())
+
+					o, err := exoscale.NewObjectStorage(exoscaleClient, k8sClient, dbURL, billingDate)
 					if err != nil {
 						return fmt.Errorf("object storage: %w", err)
 					}
@@ -110,7 +118,7 @@ func ExoscaleCmds() *cli.Command {
 					ctrl.SetLogger(logger)
 
 					logger.Info("Creating Exoscale client")
-					exoscaleClient, err := exoscale.InitClient(accessKey, secret)
+					exoscaleClient, err := exoscale.NewClient(accessKey, secret)
 					if err != nil {
 						return fmt.Errorf("exoscale client: %w", err)
 					}
@@ -121,7 +129,9 @@ func ExoscaleCmds() *cli.Command {
 						return fmt.Errorf("k8s client: %w", err)
 					}
 
-					o, err := exoscale.NewDBaaS(exoscaleClient, k8sClient, dbURL)
+					billingDate := time.Now().In(time.UTC).Truncate(time.Hour)
+
+					o, err := exoscale.NewDBaaS(exoscaleClient, k8sClient, dbURL, billingDate)
 					if err != nil {
 						return fmt.Errorf("dbaas service: %w", err)
 					}

@@ -60,14 +60,7 @@ type DBaaS struct {
 }
 
 // NewDBaaS creates a Service with the initial setup
-func NewDBaaS(exoscaleClient *egoscale.Client, k8sClient k8s.Client, databaseURL string) (*DBaaS, error) {
-	location, err := time.LoadLocation(timeZone)
-	if err != nil {
-		return nil, fmt.Errorf("cannot initialize location from time zone %s: %w", location, err)
-	}
-	now := time.Now().In(location)
-	billingDate := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, now.Location())
-
+func NewDBaaS(exoscaleClient *egoscale.Client, k8sClient k8s.Client, databaseURL string, billingDate time.Time) (*DBaaS, error) {
 	return &DBaaS{
 		exoscaleClient: exoscaleClient,
 		k8sClient:      k8sClient,

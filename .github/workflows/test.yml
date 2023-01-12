@@ -30,7 +30,7 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Run tests
-        run: make test
+        run: make test-integration
 
   golden:
     runs-on: ubuntu-latest

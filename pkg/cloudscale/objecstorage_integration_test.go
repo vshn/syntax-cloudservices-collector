@@ -5,7 +5,6 @@ package cloudscale
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -17,15 +16,13 @@ import (
 	"github.com/vshn/exoscale-metrics-collector/pkg/reporting"
 	"github.com/vshn/exoscale-metrics-collector/pkg/test"
 	cloudscalev1 "github.com/vshn/provider-cloudscale/apis/cloudscale/v1"
-	"gopkg.in/dnaeon/go-vcr.v3/cassette"
-	"gopkg.in/dnaeon/go-vcr.v3/recorder"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type ObjectStorageTestSuite struct {
 	test.Suite
-	days int
+	billingDate time.Time
 }
 
 func (ts *ObjectStorageTestSuite) SetupSuite() {
@@ -50,51 +47,48 @@ func (ts *ObjectStorageTestSuite) TestMetrics() {
 	o, cancel := ts.setupObjectStorage()
 	defer cancel()
 
-	date, err := billingDate(ts.days)
-	assert.NoError(err)
-
 	expectedQuantities := map[AccumulateKey]float64{
 		AccumulateKey{
 			Query:     sourceQueryStorage,
 			Zone:      sourceZones[0],
 			Tenant:    "example-company",
 			Namespace: "example-project",
-			Start:     date,
+			Start:     ts.billingDate,
 		}: 1000.000004096,
 		AccumulateKey{
 			Query:     sourceQueryRequests,
 			Zone:      sourceZones[0],
 			Tenant:    "example-company",
 			Namespace: "example-project",
-			Start:     date,
+			Start:     ts.billingDate,
 		}: 100.001,
 		AccumulateKey{
 			Query:     sourceQueryTrafficOut,
 			Zone:      sourceZones[0],
 			Tenant:    "example-company",
 			Namespace: "example-project",
-			Start:     date,
+			Start:     ts.billingDate,
 		}: 50.0,
 		AccumulateKey{
 			Query:     sourceQueryStorage,
 			Zone:      sourceZones[0],
 			Tenant:    "big-corporation",
 			Namespace: "next-big-thing",
-			Start:     date,
+			Start:     ts.billingDate,
 		}: 0,
 		AccumulateKey{
 			Query:     sourceQueryRequests,
 			Zone:      sourceZones[0],
 			Tenant:    "big-corporation",
 			Namespace: "next-big-thing",
-			Start:     date,
+			Start:     ts.billingDate,
 		}: 0.001,
 		AccumulateKey{
 			Query:     sourceQueryTrafficOut,
 			Zone:      sourceZones[0],
 			Tenant:    "big-corporation",
 			Namespace: "next-big-thing",
-			Start:     date,
+			Start:     ts.billingDate,
 		}: 0,
 	}
 	nameNsMap := map[string]string{
@@ -127,11 +121,13 @@ func (ts *ObjectStorageTestSuite) TestMetrics() {
 	// a bit pointless to use a transaction for checking the results but I wanted to avoid exposing something
 	// which should not be used outside test code.
 	assert.NoError(store.WithTransaction(ctx, func(tx *sqlx.Tx) error {
-		dt, err := reporting.GetDateTime(ctx, tx, date)
-		assert.NoError(err)
+		dt, err := reporting.GetDateTime(ctx, tx, ts.billingDate)
+		if !assert.NoError(err) || !assert.NotZero(dt) {
+			return fmt.Errorf("no dateTime found(%q): %w (nil? %v)", ts.billingDate, err, dt)
+		}
 
 		for key, expectedQuantity := range expectedQuantities {
-			fact, err := ts.getFact(ctx, tx, date, dt, key)
+			fact, err := ts.getFact(ctx, tx, ts.billingDate, dt, key)
 			assert.NoError(err, key)
 			if expectedQuantity == 0 {
 				assert.Nil(fact, "fact found but expectedQuantity was zero")
@@ -211,7 +207,8 @@ func (ts *ObjectStorageTestSuite) ensureBuckets(nameNsMap map[string]string) {
 
 func (ts *ObjectStorageTestSuite) setupObjectStorage() (*ObjectStorage, func()) {
 	assert := ts.Assert()
-	httpClient, cancel, err := ts.requestRecorder()
+	httpClient, cancel, err := ts.RequestRecorder("testdata/cloudscale/" + ts.T().Name())
+	assert.NoError(err)
 
 	c := cloudscale.NewClient(httpClient)
 	// required to be set when recording new response.
@@ -222,37 +219,14 @@ func (ts *ObjectStorageTestSuite) setupObjectStorage() (*ObjectStorage, func()) 
 		ts.T().Log("no API token provided")
 	}
 
-	ts.days = 1
-	o, err := NewObjectStorage(c, ts.Client, ts.days, ts.DatabaseURL)
+	location, err := time.LoadLocation("Europe/Zurich")
 	assert.NoError(err)
+
+	ts.billingDate = time.Date(2023, 1, 11, 0, 0, 0, 0, location)
+	o, err := NewObjectStorage(c, ts.Client, ts.DatabaseURL, ts.billingDate)
+	assert.NoError(err)
+
 	return o, cancel
-}
-
-func (ts *ObjectStorageTestSuite) requestRecorder() (*http.Client, func(), error) {
-	ts.T().Helper()
-
-	r, err := recorder.NewWithOptions(&recorder.Options{
-		CassetteName:       "testdata/cloudscale/" + ts.T().Name(),
-		Mode:               recorder.ModeRecordOnce,
-		RealTransport:      nil,
-		SkipRequestLatency: true,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("recorder: %w", err)
-	}
-	cancel := func() {
-		if err := r.Stop(); err != nil {
-			ts.T().Logf("recorder stop: %v", err)
-		}
-	}
-
-	r.AddHook(func(i *cassette.Interaction) error {
-		// ensure API token is not stored in recorded response
-		delete(i.Request.Headers, "Authorization")
-		return nil
-	}, recorder.AfterCaptureHook)
-
-	return r.GetDefaultClient(), cancel, nil
 }
 
 // In order for 'go test' to run this suite, we need to create

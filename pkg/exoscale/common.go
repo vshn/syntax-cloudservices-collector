@@ -17,11 +17,6 @@ const (
 	organizationLabel = "appuio.io/organization"
 	// namespaceLabel represents the label used for namespace when fetching the metrics
 	namespaceLabel = "crossplane.io/claim-namespace"
-
-	// billingHour represents the hour when metrics are collected
-	billingHour = 6
-	// timeZone represents the time zone for billingHour
-	timeZone = "UTC"
 )
 
 // Aggregated contains information needed to save the metrics of the different resource types in the database

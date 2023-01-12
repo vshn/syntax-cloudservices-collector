@@ -21,10 +21,14 @@ var Zones = []string{
 	"ch-dk-2",
 }
 
-// InitClient creates exoscale client with given access and secret keys
-func InitClient(exoscaleAccessKey, exoscaleSecret string) (*egoscale.Client, error) {
-	options := egoscale.ClientOptWithAPIEndpoint(sosEndpoint)
-	client, err := egoscale.NewClient(exoscaleAccessKey, exoscaleSecret, options)
+// NewClient creates exoscale client with given access and secret keys
+func NewClient(exoscaleAccessKey, exoscaleSecret string) (*egoscale.Client, error) {
+	return NewClientWithOptions(exoscaleAccessKey, exoscaleSecret)
+}
+
+func NewClientWithOptions(exoscaleAccessKey string, exoscaleSecret string, options ...egoscale.ClientOpt) (*egoscale.Client, error) {
+	options = append(options, egoscale.ClientOptWithAPIEndpoint(sosEndpoint))
+	client, err := egoscale.NewClient(exoscaleAccessKey, exoscaleSecret, options...)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create Exoscale client: %w", err)
 	}

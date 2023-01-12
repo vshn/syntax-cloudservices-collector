@@ -30,15 +30,7 @@ type BucketDetail struct {
 }
 
 // NewObjectStorage creates an ObjectStorage with the initial setup
-func NewObjectStorage(exoscaleClient *egoscale.Client, k8sClient k8s.Client, databaseURL string) (*ObjectStorage, error) {
-	location, err := time.LoadLocation(timeZone)
-	if err != nil {
-		return nil, fmt.Errorf("cannot initialize location from time zone %s: %w", location, err)
-	}
-	now := time.Now().In(location)
-	previousDay := now.Day() - 1
-	billingDate := time.Date(now.Year(), now.Month(), previousDay, billingHour, 0, 0, 0, now.Location())
-
+func NewObjectStorage(exoscaleClient *egoscale.Client, k8sClient k8s.Client, databaseURL string, billingDate time.Time) (*ObjectStorage, error) {
 	return &ObjectStorage{
 		exoscaleClient: exoscaleClient,
 		k8sClient:      k8sClient,
