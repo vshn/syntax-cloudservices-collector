@@ -6,9 +6,6 @@ on:
     branches:
       - master
 
-env:
-  COMPONENT_NAME: exoscale-metrics-collector
-
 jobs:
   test:
     runs-on: ubuntu-latest
