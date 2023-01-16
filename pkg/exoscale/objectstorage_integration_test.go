@@ -35,7 +35,7 @@ func (ts *ObjectStorageTestSuite) SetupSuite() {
 	ts.RegisterScheme(exoscalev1.SchemeBuilder.AddToScheme)
 }
 
-type source struct {
+type objectStorageSource struct {
 	namespace   string
 	tenant      string
 	objectType  exofixtures.ObjectType
@@ -64,12 +64,8 @@ func (ts *ObjectStorageTestSuite) TestMetrics() {
 	}
 	ts.ensureBuckets(nameNsMap)
 
-	createdNs := make(map[string]bool)
-	for _, ns := range nameNsMap {
-		if _, ok := createdNs[ns]; !ok {
-			ts.EnsureNS(ns, map[string]string{organizationLabel: nsTenantMap[ns]})
-			createdNs[ns] = true
-		}
+	for ns, tenant := range nsTenantMap {
+		ts.EnsureNS(ns, map[string]string{organizationLabel: tenant})
 	}
 
 	assert.NoError(o.Execute(ctx))
@@ -89,7 +85,7 @@ func (ts *ObjectStorageTestSuite) TestMetrics() {
 		}
 
 		for ns, expectedQuantity := range expectedQuantities {
-			fact, err := ts.getFact(ctx, tx, ts.billingDate, dt, source{
+			fact, err := ts.getFact(ctx, tx, ts.billingDate, dt, objectStorageSource{
 				namespace:   ns,
 				tenant:      nsTenantMap[ns],
 				objectType:  exofixtures.SosType,
@@ -104,7 +100,7 @@ func (ts *ObjectStorageTestSuite) TestMetrics() {
 	}))
 }
 
-func (ts *ObjectStorageTestSuite) getFact(ctx context.Context, tx *sqlx.Tx, date time.Time, dt *db.DateTime, src source) (*db.Fact, error) {
+func (ts *ObjectStorageTestSuite) getFact(ctx context.Context, tx *sqlx.Tx, date time.Time, dt *db.DateTime, src objectStorageSource) (*db.Fact, error) {
 	sourceString := sosSourceString{
 		ObjectType: src.objectType,
 		provider:   exofixtures.Provider,
@@ -117,44 +113,7 @@ func (ts *ObjectStorageTestSuite) getFact(ctx context.Context, tx *sqlx.Tx, date
 		DiscountSource: sourceString.getSourceString(),
 		QueryName:      sourceString.getQuery(),
 	}
-
-	query, err := reporting.GetQueryByName(ctx, tx, record.QueryName)
-	if err != nil {
-		return nil, fmt.Errorf("query: %w", err)
-	}
-
-	tenant, err := reporting.GetTenantBySource(ctx, tx, record.TenantSource)
-	if err != nil {
-		return nil, fmt.Errorf("tenant: %w", err)
-	}
-
-	category, err := reporting.GetCategory(ctx, tx, record.CategorySource)
-	if err != nil {
-		return nil, fmt.Errorf("category: %w", err)
-	}
-
-	product, err := reporting.GetBestMatchingProduct(ctx, tx, record.ProductSource, record.BillingDate)
-	if err != nil {
-		return nil, fmt.Errorf("product: %w", err)
-	}
-
-	discount, err := reporting.GetBestMatchingDiscount(ctx, tx, record.DiscountSource, record.BillingDate)
-	if err != nil {
-		return nil, fmt.Errorf("discount: %w", err)
-	}
-
-	fact, err := reporting.GetByFact(ctx, tx, &db.Fact{
-		DateTimeId: dt.Id,
-		QueryId:    query.Id,
-		TenantId:   tenant.Id,
-		CategoryId: category.Id,
-		ProductId:  product.Id,
-		DiscountId: discount.Id,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("fact: %w", err)
-	}
-	return fact, nil
+	return reporting.FactByRecord(ctx, tx, dt, record)
 }
 
 func (ts *ObjectStorageTestSuite) ensureBuckets(nameNsMap map[string]string) {
@@ -174,27 +133,37 @@ func (ts *ObjectStorageTestSuite) ensureBuckets(nameNsMap map[string]string) {
 }
 
 func (ts *ObjectStorageTestSuite) setupObjectStorage() (*ObjectStorage, func()) {
-	assert := ts.Assert()
-	httpClient, cancel, err := ts.RequestRecorder("testdata/exoscale/" + ts.T().Name())
+	exoClient, cancel, err := newEgoscaleClient(ts.T())
+	ts.Assert().NoError(err)
+
+	ts.billingDate = time.Date(2023, 1, 11, 6, 0, 0, 0, time.UTC)
+	o, err := NewObjectStorage(exoClient, ts.Client, ts.DatabaseURL, ts.billingDate)
+	ts.Assert().NoError(err)
+	return o, cancel
+}
+
+func newEgoscaleClient(t *testing.T) (*egoscale.Client, func(), error) {
+	httpClient, cancel, err := test.RequestRecorder(t, "testdata/exoscale/"+t.Name())
+	if err != nil {
+		return nil, nil, fmt.Errorf("request recorder: %w", err)
+	}
 
 	apiKey := os.Getenv("EXOSCALE_API_KEY")
 	secret := os.Getenv("EXOSCALE_API_SECRET")
 	if apiKey != "" && secret != "" {
-		ts.T().Log("api key & secret set")
+		t.Log("api key & secret set")
 	} else {
 		// override empty values since otherwise egoscale complains
 		apiKey = "NOTVALID"
 		secret = "NOTVALIDSECRET"
-		ts.T().Log("api key or secret not set")
+		t.Log("api key or secret not set")
 	}
 
 	exoClient, err := NewClientWithOptions(apiKey, secret, egoscale.ClientOptWithHTTPClient(httpClient))
-	assert.NoError(err)
-
-	ts.billingDate = time.Date(2023, 1, 11, 6, 0, 0, 0, time.UTC)
-	o, err := NewObjectStorage(exoClient, ts.Client, ts.DatabaseURL, ts.billingDate)
-	assert.NoError(err)
-	return o, cancel
+	if err != nil {
+		return nil, nil, fmt.Errorf("new client: %w", err)
+	}
+	return exoClient, cancel, nil
 }
 
 // In order for 'go test' to run this suite, we need to create

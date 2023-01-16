@@ -10,6 +10,46 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+func FactByRecord(ctx context.Context, tx *sqlx.Tx, dt *db.DateTime, record Record) (*db.Fact, error) {
+	query, err := GetQueryByName(ctx, tx, record.QueryName)
+	if err != nil {
+		return nil, fmt.Errorf("query: %w", err)
+	}
+
+	tenant, err := GetTenantBySource(ctx, tx, record.TenantSource)
+	if err != nil {
+		return nil, fmt.Errorf("tenant: %w", err)
+	}
+
+	category, err := GetCategory(ctx, tx, record.CategorySource)
+	if err != nil {
+		return nil, fmt.Errorf("category: %w", err)
+	}
+
+	product, err := GetBestMatchingProduct(ctx, tx, record.ProductSource, record.BillingDate)
+	if err != nil {
+		return nil, fmt.Errorf("product: %w", err)
+	}
+
+	discount, err := GetBestMatchingDiscount(ctx, tx, record.DiscountSource, record.BillingDate)
+	if err != nil {
+		return nil, fmt.Errorf("discount: %w", err)
+	}
+
+	fact, err := GetByFact(ctx, tx, &db.Fact{
+		DateTimeId: dt.Id,
+		QueryId:    query.Id,
+		TenantId:   tenant.Id,
+		CategoryId: category.Id,
+		ProductId:  product.Id,
+		DiscountId: discount.Id,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("fact: %w", err)
+	}
+	return fact, nil
+}
+
 func GetByFact(ctx context.Context, tx *sqlx.Tx, fact *db.Fact) (*db.Fact, error) {
 	var facts []db.Fact
 	err := sqlx.SelectContext(ctx, tx, &facts,

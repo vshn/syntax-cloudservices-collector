@@ -149,44 +149,7 @@ func (ts *ObjectStorageTestSuite) getFact(ctx context.Context, tx *sqlx.Tx, date
 		DiscountSource: src.String(),
 		QueryName:      src.Query + ":" + src.Zone,
 	}
-
-	query, err := reporting.GetQueryByName(ctx, tx, record.QueryName)
-	if err != nil {
-		return nil, fmt.Errorf("query: %w", err)
-	}
-
-	tenant, err := reporting.GetTenantBySource(ctx, tx, record.TenantSource)
-	if err != nil {
-		return nil, fmt.Errorf("tenant: %w", err)
-	}
-
-	category, err := reporting.GetCategory(ctx, tx, record.CategorySource)
-	if err != nil {
-		return nil, fmt.Errorf("category: %w", err)
-	}
-
-	product, err := reporting.GetBestMatchingProduct(ctx, tx, record.ProductSource, record.BillingDate)
-	if err != nil {
-		return nil, fmt.Errorf("product: %w", err)
-	}
-
-	discount, err := reporting.GetBestMatchingDiscount(ctx, tx, record.DiscountSource, record.BillingDate)
-	if err != nil {
-		return nil, fmt.Errorf("discount: %w", err)
-	}
-
-	fact, err := reporting.GetByFact(ctx, tx, &db.Fact{
-		DateTimeId: dt.Id,
-		QueryId:    query.Id,
-		TenantId:   tenant.Id,
-		CategoryId: category.Id,
-		ProductId:  product.Id,
-		DiscountId: discount.Id,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("fact: %w", err)
-	}
-	return fact, nil
+	return reporting.FactByRecord(ctx, tx, dt, record)
 }
 
 func (ts *ObjectStorageTestSuite) ensureBuckets(nameNsMap map[string]string) {
@@ -207,7 +170,7 @@ func (ts *ObjectStorageTestSuite) ensureBuckets(nameNsMap map[string]string) {
 
 func (ts *ObjectStorageTestSuite) setupObjectStorage() (*ObjectStorage, func()) {
 	assert := ts.Assert()
-	httpClient, cancel, err := ts.RequestRecorder("testdata/cloudscale/" + ts.T().Name())
+	httpClient, cancel, err := test.RequestRecorder(ts.T(), "testdata/cloudscale/"+ts.T().Name())
 	assert.NoError(err)
 
 	c := cloudscale.NewClient(httpClient)

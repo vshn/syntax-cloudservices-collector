@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"testing"
 
 	"github.com/appuio/appuio-cloud-reporting/pkg/db"
 	"github.com/go-logr/logr"
@@ -100,33 +101,6 @@ func (ts *Suite) SetupEnv(crdPaths []string) {
 	ts.Env = testEnv
 	ts.Config = config
 	ts.Client = k8sClient
-}
-
-func (ts *Suite) RequestRecorder(path string) (*http.Client, func(), error) {
-	ts.T().Helper()
-
-	r, err := recorder.NewWithOptions(&recorder.Options{
-		CassetteName:       path,
-		Mode:               recorder.ModeRecordOnce,
-		RealTransport:      nil,
-		SkipRequestLatency: true,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("recorder: %w", err)
-	}
-	cancel := func() {
-		if err := r.Stop(); err != nil {
-			ts.T().Logf("recorder stop: %v", err)
-		}
-	}
-
-	r.AddHook(func(i *cassette.Interaction) error {
-		// ensure API token is not stored in recorded response
-		delete(i.Request.Headers, "Authorization")
-		return nil
-	}, recorder.AfterCaptureHook)
-
-	return r.GetDefaultClient(), cancel, nil
 }
 
 // RegisterScheme passes the current scheme to the given SchemeBuilder func.
@@ -229,4 +203,31 @@ func openMaintenance(dbURL string) (*sqlx.DB, error) {
 		return nil, fmt.Errorf("error connecting to maintenance (`%s`) database: %w", maintURL.Path, err)
 	}
 	return mdb, nil
+}
+
+func RequestRecorder(t *testing.T, path string) (*http.Client, func(), error) {
+	t.Helper()
+
+	r, err := recorder.NewWithOptions(&recorder.Options{
+		CassetteName:       path,
+		Mode:               recorder.ModeRecordOnce,
+		RealTransport:      nil,
+		SkipRequestLatency: true,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("recorder: %w", err)
+	}
+	cancel := func() {
+		if err := r.Stop(); err != nil {
+			t.Logf("recorder stop: %v", err)
+		}
+	}
+
+	r.AddHook(func(i *cassette.Interaction) error {
+		// ensure API token is not stored in recorded response
+		delete(i.Request.Headers, "Authorization")
+		return nil
+	}, recorder.AfterCaptureHook)
+
+	return r.GetDefaultClient(), cancel, nil
 }
