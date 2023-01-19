@@ -17,9 +17,9 @@ require (
 	github.com/vshn/provider-exoscale v0.8.1
 	go.uber.org/zap v1.24.0
 	gopkg.in/dnaeon/go-vcr.v3 v3.1.2
-	k8s.io/api v0.26.0
-	k8s.io/apimachinery v0.26.0
-	k8s.io/client-go v0.26.0
+	k8s.io/api v0.26.1
+	k8s.io/apimachinery v0.26.1
+	k8s.io/client-go v0.26.1
 	sigs.k8s.io/controller-runtime v0.14.1
 )
 
