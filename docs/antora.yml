@@ -1,5 +1,5 @@
-name: exoscale-metrics-collector
-title: exoscale-metrics-collector
+name: billing-collector-cloudservices
+title: billing-collector-cloudservices
 version: master
 start_page: ROOT:index.adoc
 nav:

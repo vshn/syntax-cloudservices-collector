@@ -7,8 +7,8 @@ import (
 
 	"github.com/appuio/appuio-cloud-reporting/pkg/db"
 	egoscale "github.com/exoscale/egoscale/v2"
-	"github.com/vshn/exoscale-metrics-collector/pkg/exofixtures"
-	"github.com/vshn/exoscale-metrics-collector/pkg/reporting"
+	"github.com/vshn/billing-collector-cloudservices/pkg/exofixtures"
+	"github.com/vshn/billing-collector-cloudservices/pkg/reporting"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"

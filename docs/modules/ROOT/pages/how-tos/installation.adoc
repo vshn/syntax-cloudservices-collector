@@ -30,7 +30,7 @@ The access to the desired cluster from where the metrics should be collected has
 [source,yaml]
 ----
 applications:
-  - metrics-collector
+  - billing-collector-cloudservices
 
 parameters:
   metrics_collector:

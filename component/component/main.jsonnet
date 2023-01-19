@@ -1,6 +1,6 @@
 local kap = import 'lib/kapitan.libjsonnet';
 local inv = kap.inventory();
-local params = inv.parameters.metrics_collector;
+local params = inv.parameters.billing_collector_cloudservices;
 local paramsACR = inv.parameters.appuio_cloud_reporting;
 local kube = import 'lib/kube.libjsonnet';
 local com = import 'lib/commodore.libjsonnet';
@@ -8,7 +8,7 @@ local collectorImage = '%(registry)s/%(repository)s:%(tag)s' % params.images.col
 local alias = inv.parameters._instance;
 local alias_suffix = '-' + alias;
 local credentials_secret_name = 'credentials' + alias_suffix;
-local component_name = 'metrics-collector';
+local component_name = 'billing-collector-cloudservices';
 
 
 local labels = {
@@ -46,7 +46,7 @@ local cronjob(name, subcommand, schedule) = {
             restartPolicy: 'OnFailure',
             containers: [
               {
-                name: 'metrics-collector-backfill',
+                name: 'billing-collector-cloudservices-backfill',
                 image: collectorImage,
                 args: [
                   subcommand,

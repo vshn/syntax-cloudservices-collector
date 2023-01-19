@@ -1,5 +1,5 @@
 parameters:
-  metrics_collector:
+  billing_collector_cloudservices:
     =_metadata:
       multi_instance: true
 
@@ -20,8 +20,8 @@ parameters:
     images:
       collector:
         registry: 'ghcr.io'
-        repository: 'vshn/metrics-collector'
-        tag: 'refactored-collectors'
+        repository: 'vshn/billing-collector-cloudservices'
+        tag: 'v1.0.0'
 
     exoscale:
       enabled: false

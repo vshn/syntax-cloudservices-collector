@@ -1,4 +1,4 @@
-module github.com/vshn/exoscale-metrics-collector
+module github.com/vshn/billing-collector-cloudservices
 
 go 1.19
 

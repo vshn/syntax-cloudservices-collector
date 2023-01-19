@@ -7,7 +7,7 @@ RUN \
     ca-certificates \
     tzdata
 
-ENTRYPOINT ["metrics-collector"]
-COPY metrics-collector /usr/bin/
+ENTRYPOINT ["billing-collector-cloudservices"]
+COPY billing-collector-cloudservices /usr/bin/
 
 USER 65536:0

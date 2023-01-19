@@ -1,18 +1,18 @@
-# exoscale-metrics-collector
+# billing-collector-cloudservices
 
-[![Build](https://img.shields.io/github/workflow/status/vshn/exoscale-metrics-collector/Test)][build]
-![Go version](https://img.shields.io/github/go-mod/go-version/vshn/exoscale-metrics-collector)
-[![Version](https://img.shields.io/github/v/release/vshn/exoscale-metrics-collector)][releases]
-[![GitHub downloads](https://img.shields.io/github/downloads/vshn/exoscale-metrics-collector/total)][releases]
+[![Build](https://img.shields.io/github/workflow/status/vshn/billing-collector-cloudservices/Test)][build]
+![Go version](https://img.shields.io/github/go-mod/go-version/vshn/billing-collector-cloudservices)
+[![Version](https://img.shields.io/github/v/release/vshn/billing-collector-cloudservices)][releases]
+[![GitHub downloads](https://img.shields.io/github/downloads/vshn/billing-collector-cloudservices/total)][releases]
 
-[build]: https://github.com/vshn/exoscale-metrics-collector/actions?query=workflow%3ATest
-[releases]: https://github.com/vshn/exoscale-metrics-collector/releases
+[build]: https://github.com/vshn/billing-collector-cloudservices/actions?query=workflow%3ATest
+[releases]: https://github.com/vshn/billing-collector-cloudservices/releases
 
 Batch job to sync usage data from the Exoscale and Cloudscale API to the [APPUiO Cloud reporting](https://github.com/appuio/appuio-cloud-reporting/) database.
 
 Metrics are collected taking into account product (e.g. `object-storage-storage:exoscale`), source (e.g. `exoscale:namespace`), tenant (as organization) and date time.
 
-See the [component documentation](https://hub.syn.tools/exoscale-metrics-collector/index.html) for more information.
+See the [component documentation](https://hub.syn.tools/billing-collector-cloudservices/index.html) for more information.
 
 ## Getting started for developers
 
@@ -42,12 +42,12 @@ Then, run one of the available commands:
 
 * Object Storage:
 ```
-$ ./metrics-collector exoscale objectstorage
+$ ./billing-collector-cloudservices exoscale objectstorage
 ```
 
 * DBaaS (runs metrics collector for all supported databases):
 ```
-$ ./metrics-collector exoscale dbaas
+$ ./billing-collector-cloudservices exoscale dbaas
 ```
 
 ### Billing Database
@@ -85,7 +85,7 @@ spec:
 
 Once the database is created and `Ready`, you can run locally the command:
 ```
-$ ./metrics-collector exoscale dbaas
+$ ./billing-collector-cloudservices exoscale dbaas
 ```
 
 The same works for other resources. Just apply the right claim and run the proper command.
@@ -106,21 +106,21 @@ The commands assume that you are logged in to the Kubernetes cluster you want to
 
 Instructions for OpenShift >=4.11:
 ```
-$ cd exoscale-metrics-collector
+$ cd billing-collector-cloudservices
 $ oc -n default --as cluster-admin apply -f clusterrole.yaml 
-$ oc -n default --as cluster-admin create serviceaccount vshn-exoscale-metrics-collector
-$ oc --as cluster-admin adm policy add-cluster-role-to-user vshn-exoscale-metrics-collector system:serviceaccount:default:vshn-exoscale-metrics-collector
+$ oc -n default --as cluster-admin create serviceaccount vshn-billing-collector-cloudservices
+$ oc --as cluster-admin adm policy add-cluster-role-to-user vshn-billing-collector-cloudservices system:serviceaccount:default:vshn-billing-collector-cloudservices
 $ oc -n default --as cluster-admin apply -f clusterrole-secret.yaml
-$ oc -n default --as cluster-admin get secret vshn-exoscale-metrics-collector-secret -o jsonpath='{.data.token}' | base64 -d
+$ oc -n default --as cluster-admin get secret vshn-billing-collector-cloudservices-secret -o jsonpath='{.data.token}' | base64 -d
 ```
 
 Instructions for OpenShift <=4.10:
 ```
-$ cd exoscale-metrics-collector
+$ cd billing-collector-cloudservices
 $ oc -n default --as cluster-admin apply -f clusterrole.yaml 
-$ oc -n default --as cluster-admin create serviceaccount vshn-exoscale-metrics-collector
-$ oc --as cluster-admin adm policy add-cluster-role-to-user vshn-exoscale-metrics-collector system:serviceaccount:default:vshn-exoscale-metrics-collector
-$ oc -n default --as cluster-admin serviceaccounts get-token vshn-exoscale-metrics-collector
+$ oc -n default --as cluster-admin create serviceaccount vshn-billing-collector-cloudservices
+$ oc --as cluster-admin adm policy add-cluster-role-to-user vshn-billing-collector-cloudservices system:serviceaccount:default:vshn-billing-collector-cloudservices
+$ oc -n default --as cluster-admin serviceaccounts get-token vshn-billing-collector-cloudservices
 ```
 
 The last command will print out your token without trailing newline; be sure to copy the correct part of the output.
@@ -146,5 +146,5 @@ EXOSCALE_CRDS_PATH="$(go list -f '{{.Dir}}' -m github.com/vshn/provider-exoscale
 CLOUDSCALE_CRDS_PATH="$(go list -f '{{.Dir}}' -m github.com/vshn/provider-cloudscale)/package/crds)"
 
 # make sure to run make target `test-integration` first to have everything setup correctly.
-KUBEBUILDER_ASSETS="$(/path/to/exoscale-metrics-collector/.work/bin/setup-envtest --bin-dir "/path/to/exoscale-metrics-collector/.work/bin" use -i -p path '1.24.x!')"
+KUBEBUILDER_ASSETS="$(/path/to/billing-collector-cloudservices/.work/bin/setup-envtest --bin-dir "/path/to/billing-collector-cloudservices/.work/bin" use -i -p path '1.24.x!')"
 ```

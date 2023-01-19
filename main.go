@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v2"
-	"github.com/vshn/exoscale-metrics-collector/pkg/cmd"
-	"github.com/vshn/exoscale-metrics-collector/pkg/log"
+	"github.com/vshn/billing-collector-cloudservices/pkg/cmd"
+	"github.com/vshn/billing-collector-cloudservices/pkg/log"
 )
 
 var (
@@ -20,7 +20,7 @@ var (
 	commit  = "-dirty-"
 	date    = time.Now().Format("2006-01-02")
 
-	appName     = "metrics-collector"
+	appName     = "billing-collector-cloudservices"
 	appLongName = "Metrics collector which gathers metrics information for cloud services"
 )
 
