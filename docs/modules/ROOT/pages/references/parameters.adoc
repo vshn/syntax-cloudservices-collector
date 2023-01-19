@@ -15,7 +15,7 @@ See xref:how-tos/installation.adoc[Installation] for a full example.
 
 [horizontal]
 type:: dictionary
-default:: https://github.com/vshn/exoscale-metrics-collector/blob/master/component/class/defaults.yml[See class/defaults.yml].
+default:: https://github.com/vshn/billing-collector-cloudservices/blob/master/component/class/defaults.yml[See class/defaults.yml].
 
 Dictionary containing the container images used by this component.
 

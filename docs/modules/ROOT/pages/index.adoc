@@ -1,4 +1,4 @@
-= metrics-collector
+= billing-collector-cloudservices
 
 Batch job to sync usage data from the Exoscale and Cloudscale metrics APIs to the https://github.com/appuio/appuio-cloud-reporting/[APPUiO Cloud Reporting] database.
 

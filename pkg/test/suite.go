@@ -17,7 +17,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/vshn/exoscale-metrics-collector/pkg/reporting"
+	"github.com/vshn/billing-collector-cloudservices/pkg/reporting"
 	"go.uber.org/zap/zaptest"
 	"gopkg.in/dnaeon/go-vcr.v3/cassette"
 	"gopkg.in/dnaeon/go-vcr.v3/recorder"

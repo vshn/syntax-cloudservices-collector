@@ -10,8 +10,8 @@ This guide provides an example how to deploy multiple instances of this componen
 [source,yaml]
 ----
 applications:
-  - metrics-collector as collector-exoscale-ch-gva-2 <1>
-  - metrics-collector as collector-cloudscale-rma-0 <2>
+  - billing-collector-cloudservices as collector-exoscale-ch-gva-2 <1>
+  - billing-collector-cloudservices as collector-cloudscale-rma-0 <2>
 parameters:
   appuio_cloud_reporting:
     namespace: 'appuio-cloud-reporting'
@@ -34,8 +34,8 @@ parent="clusters/kv/${TENANT_ID}/${CLUSTER_ID}"
 instance_1="collector-exoscale-ch-gva-2"
 instance_2="collector-cloudscale-rma-0"
 
-vault kv put "${parent}/exoscale-metrics-collector/${instance_1}" exoscale-key=<key-1> exoscale-secret=<secret-1> cluster-server=<server-url-1> cluster-token=<token-1>
-vault kv put "${parent}/exoscale-metrics-collector/${instance_2}" exoscale-key=<key-2> exoscale-secret=<secret-2> cluster-server=<server-url-2> cluster-token=<token-2>
+vault kv put "${parent}/billing-collector-cloudservices/${instance_1}" exoscale-key=<key-1> exoscale-secret=<secret-1> cluster-server=<server-url-1> cluster-token=<token-1>
+vault kv put "${parent}/billing-collector-cloudservices/${instance_2}" exoscale-key=<key-2> exoscale-secret=<secret-2> cluster-server=<server-url-2> cluster-token=<token-2>
 ----
 +
 

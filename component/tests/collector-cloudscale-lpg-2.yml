@@ -10,6 +10,6 @@ parameters:
       parameters: 'sslmode=disable'
       password: 'passw0rd'
       port: 5432
-  metrics_collector:
+  billing_collector_cloudservices:
     exoscale:
       enabled: true

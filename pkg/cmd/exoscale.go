@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v2"
-	"github.com/vshn/exoscale-metrics-collector/pkg/exoscale"
-	"github.com/vshn/exoscale-metrics-collector/pkg/kubernetes"
-	"github.com/vshn/exoscale-metrics-collector/pkg/log"
+	"github.com/vshn/billing-collector-cloudservices/pkg/exoscale"
+	"github.com/vshn/billing-collector-cloudservices/pkg/kubernetes"
+	"github.com/vshn/billing-collector-cloudservices/pkg/log"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 

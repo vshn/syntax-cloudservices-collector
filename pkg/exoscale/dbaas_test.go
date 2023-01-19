@@ -7,7 +7,7 @@ import (
 
 	egoscale "github.com/exoscale/egoscale/v2"
 	"github.com/stretchr/testify/assert"
-	"github.com/vshn/exoscale-metrics-collector/pkg/exofixtures"
+	"github.com/vshn/billing-collector-cloudservices/pkg/exofixtures"
 )
 
 func TestDBaaS_aggregatedDBaaS(t *testing.T) {

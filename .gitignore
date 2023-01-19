@@ -3,7 +3,7 @@
 /.github/release-notes.md
 
 # Build
-/metrics-collector
+/billing-collector-cloudservices
 *.out
 /component/compiled
 /component/vendor

@@ -7,9 +7,9 @@ import (
 
 	"github.com/cloudscale-ch/cloudscale-go-sdk/v2"
 	"github.com/urfave/cli/v2"
-	cs "github.com/vshn/exoscale-metrics-collector/pkg/cloudscale"
-	"github.com/vshn/exoscale-metrics-collector/pkg/kubernetes"
-	"github.com/vshn/exoscale-metrics-collector/pkg/log"
+	cs "github.com/vshn/billing-collector-cloudservices/pkg/cloudscale"
+	"github.com/vshn/billing-collector-cloudservices/pkg/kubernetes"
+	"github.com/vshn/billing-collector-cloudservices/pkg/log"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
