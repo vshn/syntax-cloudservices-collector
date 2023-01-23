@@ -7,21 +7,21 @@ parameters:
       exoscale:
         credentials:
           stringData:
-            EXOSCALE_API_KEY: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/${_instance}/exoscale-key}"
-            EXOSCALE_API_SECRET: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/${_instance}/exoscale-secret}"
-            KUBERNETES_SERVER_URL: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/${_instance}/cluster-server}"
-            KUBERNETES_SERVER_TOKEN: "?{vaultkv:${cluster:tenant}/${cluster:name}/exoscale-metrics-collector/${_instance}/cluster-token}"
+            EXOSCALE_API_KEY: "?{vaultkv:${cluster:tenant}/${cluster:name}/billing-collector-cloudservices/${_instance}/exoscale-key}"
+            EXOSCALE_API_SECRET: "?{vaultkv:${cluster:tenant}/${cluster:name}/billing-collector-cloudservices/${_instance}/exoscale-secret}"
+            KUBERNETES_SERVER_URL: "?{vaultkv:${cluster:tenant}/${cluster:name}/billing-collector-cloudservices/${_instance}/cluster-server}"
+            KUBERNETES_SERVER_TOKEN: "?{vaultkv:${cluster:tenant}/${cluster:name}/billing-collector-cloudservices/${_instance}/cluster-token}"
       cloudscale:
         credentials:
           stringData:
-            CLOUDSCALE_API_TOKEN: "?{vaultkv:${cluster:tenant}/${cluster:name}/cloudscale-metrics-collector/${_instance}/token}"
-            KUBERNETES_SERVER_URL: "?{vaultkv:${cluster:tenant}/${cluster:name}/cloudscale-metrics-collector/${_instance}/cluster-server}"
-            KUBERNETES_SERVER_TOKEN: "?{vaultkv:${cluster:tenant}/${cluster:name}/cloudscale-metrics-collector/${_instance}/cluster-token}"
+            CLOUDSCALE_API_TOKEN: "?{vaultkv:${cluster:tenant}/${cluster:name}/billing-collector-cloudservices/${_instance}/token}"
+            KUBERNETES_SERVER_URL: "?{vaultkv:${cluster:tenant}/${cluster:name}/billing-collector-cloudservices/${_instance}/cluster-server}"
+            KUBERNETES_SERVER_TOKEN: "?{vaultkv:${cluster:tenant}/${cluster:name}/billing-collector-cloudservices/${_instance}/cluster-token}"
     images:
       collector:
         registry: 'ghcr.io'
         repository: 'vshn/billing-collector-cloudservices'
-        tag: 'v1.0.0'
+        tag: 'v1.0.1'
 
     exoscale:
       enabled: false

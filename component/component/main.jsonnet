@@ -28,7 +28,7 @@ local secret(key) = [
   for s in std.objectFields(params.secrets[key])
 ];
 
-local cronjob(name, subcommand, schedule) = {
+local cronjob(name, args, schedule) = {
   kind: 'CronJob',
   apiVersion: 'batch/v1',
   metadata: {
@@ -48,9 +48,7 @@ local cronjob(name, subcommand, schedule) = {
               {
                 name: 'billing-collector-cloudservices-backfill',
                 image: collectorImage,
-                args: [
-                  subcommand,
-                ],
+                args: args,
                 envFrom: [
                   {
                     secretRef: {
@@ -107,8 +105,8 @@ assert params.exoscale.enabled != params.cloudscale.enabled : 'only one of the c
   assert secrets.credentials.stringData.KUBERNETES_SERVER_TOKEN != null : 'secrets.credentials.stringData.KUBERNETES_SERVER_TOKEN must be set.',
 
   secrets: std.filter(function(it) it != null, secret('exoscale')),
-  objectStorageCronjob: cronjob(alias + '-objectstorage', 'exoscale objectstorage', params.exoscale.objectStorage.schedule),
-  [if params.exoscale.dbaas.enabled then 'dbaasCronjob']: cronjob(alias + '-dbaas', 'exoscale dbaas', params.exoscale.dbaas.schedule),
+  objectStorageCronjob: cronjob(alias + '-objectstorage', ['exoscale', 'objectstorage'], params.exoscale.objectStorage.schedule),
+  [if params.exoscale.dbaas.enabled then 'dbaasCronjob']: cronjob(alias + '-dbaas', ['exoscale', 'dbaas'], params.exoscale.dbaas.schedule),
 } else {})
 +
 (if params.cloudscale.enabled then {
@@ -121,5 +119,5 @@ assert params.exoscale.enabled != params.cloudscale.enabled : 'only one of the c
   assert secrets.credentials.stringData.KUBERNETES_SERVER_TOKEN != null : 'secrets.credentials.stringData.KUBERNETES_SERVER_TOKEN must be set.',
 
   secrets: std.filter(function(it) it != null, secret('cloudscale')),
-  [if params.cloudscale.objectStorage.enabled then 'objectStorageCronjob']: cronjob(alias + '-objectstorage', 'cloudscale objectstorage', params.cloudscale.objectStorage.schedule),
+  [if params.cloudscale.objectStorage.enabled then 'objectStorageCronjob']: cronjob(alias + '-objectstorage', ['cloudscale', 'objectstorage'], params.cloudscale.objectStorage.schedule),
 } else {})

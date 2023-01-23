@@ -17,7 +17,8 @@ spec:
         spec:
           containers:
             - args:
-                - exoscale objectstorage
+                - exoscale
+                - objectstorage
               env:
                 - name: password
                   valueFrom:
@@ -34,7 +35,7 @@ spec:
               envFrom:
                 - secretRef:
                     name: credentials-exoscale-metrics-collector
-              image: ghcr.io/vshn/billing-collector-cloudservices:v1.0.0
+              image: ghcr.io/vshn/billing-collector-cloudservices:v1.0.1
               name: billing-collector-cloudservices-backfill
               resources: {}
           restartPolicy: OnFailure
