@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/appuio/appuio-cloud-reporting v0.7.1
 	github.com/cloudscale-ch/cloudscale-go-sdk/v2 v2.1.0
-	github.com/exoscale/egoscale v0.90.1
+	github.com/exoscale/egoscale v1.19.0
 	github.com/go-logr/logr v1.2.3
 	github.com/go-logr/zapr v1.2.3
 	github.com/google/uuid v1.3.0
