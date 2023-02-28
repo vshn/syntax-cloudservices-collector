@@ -3,6 +3,9 @@ parameters:
     =_metadata:
       multi_instance: true
 
+    namespace: appuio-cloud-reporting
+    database: {}
+
     secrets:
       exoscale:
         credentials:
