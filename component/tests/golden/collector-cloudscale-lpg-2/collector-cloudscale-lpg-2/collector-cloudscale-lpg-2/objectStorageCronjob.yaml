@@ -35,7 +35,7 @@ spec:
               envFrom:
                 - secretRef:
                     name: credentials-collector-cloudscale-lpg-2
-              image: ghcr.io/vshn/billing-collector-cloudservices:v1.0.1
+              image: ghcr.io/vshn/billing-collector-cloudservices:v1.0.2
               name: billing-collector-cloudservices-backfill
               resources: {}
           restartPolicy: OnFailure
