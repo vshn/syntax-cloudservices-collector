@@ -11,6 +11,32 @@ The parent key for all of them is `metrics_collector`.
 
 See xref:how-tos/installation.adoc[Installation] for a full example.
 
+== `namespace`
+
+[horizontal]
+type:: string
+default:: `${_instance}`
+
+The namespace in which to deploy this component.
+
+== `database`
+
+[horizontal]
+type:: dictionary
+default::
++
+[source,yaml]
+----
+host: null
+port: 5432
+name: appuio-cloud-reporting
+username: appuio-cloud-reporting
+password: null
+parameters: ''
+----
+
+Dictionary managing the connection to the reporting database.
+
 == `images`
 
 [horizontal]
