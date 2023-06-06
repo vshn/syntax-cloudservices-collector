@@ -60,12 +60,12 @@ func TestAccumulateBucketMetricsForObjectsUser(t *testing.T) {
 		Start:     date,
 	}
 
-	key.Query = "object-storage-requests"
+	key.Query = "appcat_object-storage-requests"
 	assertEqualfUint64(t, uint64(5), accumulated[key], "incorrect value in %s", key)
 
-	key.Query = "object-storage-storage"
+	key.Query = "appcat_object-storage-storage"
 	assertEqualfUint64(t, uint64(1000000), accumulated[key], "incorrect value in %s", key)
 
-	key.Query = "object-storage-traffic-out"
+	key.Query = "appcat_object-storage-traffic-out"
 	assertEqualfUint64(t, uint64(2000000), accumulated[key], "incorrect value in %s", key)
 }

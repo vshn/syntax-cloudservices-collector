@@ -7,7 +7,7 @@ import (
 )
 
 // PostgresDBaaSType represents postgres DBaaS type
-const PostgresDBaaSType ObjectType = "postgres"
+const PostgresDBaaSType ObjectType = "appcat_postgres"
 
 // Available plans for PostgreSQL
 var postgresProductDBaaS = []productDBaaS{

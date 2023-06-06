@@ -9,9 +9,9 @@ import (
 const (
 	// source format: 'query:zone:tenant:namespace' or 'query:zone:tenant:namespace:class'
 	// We do not have real (prometheus) queries here, just random hardcoded strings.
-	sourceQueryStorage    = "object-storage-storage"
-	sourceQueryTrafficOut = "object-storage-traffic-out"
-	sourceQueryRequests   = "object-storage-requests"
+	sourceQueryStorage    = "appcat_object-storage-storage"
+	sourceQueryTrafficOut = "appcat_object-storage-traffic-out"
+	sourceQueryRequests   = "appcat_object-storage-requests"
 )
 
 var (
