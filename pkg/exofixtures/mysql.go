@@ -7,7 +7,7 @@ import (
 )
 
 // MysqlDBaaSType represents mysql DBaaS type
-const MysqlDBaaSType ObjectType = "mysql"
+const MysqlDBaaSType ObjectType = "appcat_mysql"
 
 // Available plans for MySQL
 var mysqlProductDBaaS = []productDBaaS{
