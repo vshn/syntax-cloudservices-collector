@@ -25,3 +25,6 @@ ANTORA_PREVIEW_CMD ?= $(DOCKER_CMD) run --rm --publish 35729:35729 --publish 202
 ENVTEST_ADDITIONAL_FLAGS ?= --bin-dir "$(go_bin)"
 # See https://storage.googleapis.com/kubebuilder-tools/ for list of supported K8s versions
 ENVTEST_K8S_VERSION = 1.24.x
+
+DOCKER_IMAGE_GOOS = linux
+DOCKER_IMAGE_GOARCH = amd64

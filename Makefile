@@ -27,7 +27,9 @@ build-bin: fmt vet ## Build binary
 	@go build -o $(BIN_FILENAME) .
 
 .PHONY: build-docker
-build-docker: build-bin ## Build docker image
+build-docker: ## Build docker image
+	env CGO_ENABLED=0 GOOS=$(DOCKER_IMAGE_GOOS) GOARCH=$(DOCKER_IMAGE_GOARCH) \
+		go build -o ${BIN_FILENAME}
 	$(DOCKER_CMD) build -t $(CONTAINER_IMG) .
 
 .PHONY: docs-serve
