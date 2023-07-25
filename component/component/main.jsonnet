@@ -4,12 +4,8 @@ local params = inv.parameters.billing_collector_cloudservices;
 local kube = import 'lib/kube.libjsonnet';
 local com = import 'lib/commodore.libjsonnet';
 local collectorImage = '%(registry)s/%(repository)s:%(tag)s' % params.images.collector;
-local alias = inv.parameters._instance;
-local alias_suffix = '-' + alias;
-local credentials_secret_name = 'credentials' + alias_suffix;
 local component_name = 'billing-collector-cloudservices';
 
-assert std.member(inv.applications, 'appuio-cloud-reporting') : 'Component appuio-cloud-reporting must be installed';
 
 local labels = {
   'app.kubernetes.io/name': component_name,
@@ -20,7 +16,7 @@ local labels = {
 
 local secret(key) = [
   if params.secrets[key][s] != null then
-    kube.Secret(s + alias_suffix) {
+    kube.Secret(s + '-' + key) {
       metadata+: {
         namespace: params.namespace,
       },
@@ -28,110 +24,197 @@ local secret(key) = [
   for s in std.objectFields(params.secrets[key])
 ];
 
-local dbEnv = [
-  {
-    name: name,
-    valueFrom: {
-      secretKeyRef: {
-        name: params.cloud_reporting_dbsecret_name,
-        key: name,
-      },
-    },
-  }
-  for name in std.objectFields(params.database_secret)
-] + [
-  {
-    name: name,
-    [if std.type(params.database_env[name]) == 'string' then 'value' else 'valueFrom']: params.database_env[name],
-  }
-  for name in std.objectFields(params.database_env)
-] + [
-  assert params.database.url != null : 'database.url must be set.';
-  {
-    name: 'DB_PARAMS',
-    value: params.database.parameters,
+local healthProbe = {
+  httpGet: {
+    path: '/metrics',
+    port: 9123,
   },
-  {
-    name: 'ACR_DB_URL',
-    value: params.database.url,
-  },
-];
+  periodSeconds: 30,
+};
 
-local cronjob(name, args, schedule) = {
-  kind: 'CronJob',
-  apiVersion: 'batch/v1',
-  metadata: {
-    name: name,
-    namespace: params.namespace,
-    labels+: labels,
+local exoClusterRole = kube.ClusterRole('appcat:cloudcollector:exoscale') + {
+  rules: [
+    {
+      apiGroups: [ '*' ],
+      resources: [ 'namespaces' ],
+      verbs: [ 'get', 'list' ],
+    },
+    {
+      apiGroups: [ 'exoscale.crossplane.io' ],
+      resources: [
+        'buckets',
+        'postgresqls',
+        'mysqls',
+        'redis',
+        'opensearches',
+        'kafkas',
+      ],
+      verbs: [
+        'get',
+        'list',
+        'watch',
+      ],
+    },
+  ],
+};
+
+local cloudscaleClusterRole = kube.ClusterRole('appcat:cloudcollector:cloudscale') + {
+  rules: [
+    {
+      apiGroups: [ '' ],
+      resources: [ 'namespaces' ],
+      verbs: [ 'get', 'list' ],
+    },
+    {
+      apiGroups: [ 'cloudscale.crossplane.io' ],
+      resources: [
+        'buckets',
+      ],
+      verbs: [
+        'get',
+        'list',
+        'watch',
+      ],
+    },
+  ],
+};
+
+local serviceAccount(name, clusterRole) = {
+  local sa = kube.ServiceAccount(name) + {
+    metadata+: {
+      namespace: params.namespace,
+    },
   },
-  spec: {
-    concurrencyPolicy: 'Forbid',
-    failedJobsHistoryLimit: 5,
-    jobTemplate: {
-      spec: {
-        template: {
-          spec: {
-            restartPolicy: 'OnFailure',
-            containers: [
-              {
-                name: 'billing-collector-cloudservices-backfill',
-                image: collectorImage,
-                args: args,
-                envFrom: [
-                  {
-                    secretRef: {
-                      name: credentials_secret_name,
-                    },
+  local rb = kube.ClusterRoleBinding(name) {
+    roleRef_: clusterRole,
+    subjects_: [ sa ],
+  },
+  sa: sa,
+  rb: rb,
+};
+
+local deployment(name, args) =
+  kube.Deployment(name) {
+    metadata+: {
+      labels+: labels,
+      namespace: params.namespace,
+    },
+    spec+: {
+      template+: {
+        spec+: {
+          serviceAccount: name,
+          containers_:: {
+            exporter: kube.Container('exporter') {
+              imagePullPolicy: 'IfNotPresent',
+              image: collectorImage,
+              args: args,
+              envFrom: [
+                {
+                  secretRef: {
+                    name: 'credentials-' + name,
                   },
-                ],
-                env: dbEnv,
-                resources: {},
-                [if std.length(params.extra_volumes) > 0 then 'volumeMounts']: [
-                  { name: name } + params.extra_volumes[name].mount_spec
-                  for name in std.objectFields(params.extra_volumes)
-                ],
+                },
+              ],
+              ports_:: {
+                exporter: {
+                  containerPort: 9123,
+                },
               },
-            ],
-            [if std.length(params.extra_volumes) > 0 then 'volumes']: [
-              { name: name } + params.extra_volumes[name].volume_spec
-              for name in std.objectFields(params.extra_volumes)
-            ],
+              readinessProbe: healthProbe,
+              livenessProbe: healthProbe,
+            },
           },
         },
       },
     },
-    schedule: schedule,
-    successfulJobsHistoryLimit: 3,
+  };
+
+local podMonitor(name) = kube._Object('monitoring.coreos.com/v1', 'PodMonitor', 'hello') + {
+  metadata: {
+    name: name + '-podmonitor',
+    namespace: params.namespace,
+  },
+  spec: {
+    podMetricsEndpoints: [
+      {
+        port: 'exporter',
+      },
+    ],
+    selector: {
+      matchLabels: {
+        name: name,
+      },
+    },
   },
 };
 
-assert params.exoscale.enabled != params.cloudscale.enabled : 'only one of the components can be enabled: cloudscale or exoscale. not both and not neither.';
+local promRule = kube._Object('monitoring.coreos.com/v1', 'PrometheusRule', 'appcat-cloud-billing') {
+  metadata+: {
+    namespace: params.namespace,
+  },
+  spec: {
+    groups: [
+      {
+        name: 'appcat:billing:cloudservices',
+        rules: [
+          {
+            expr: 'max_over_time(appcat:raw:billing{type="dbaas"}[1h])',
+            record: 'appcat:billing',
+          },
+          {
+            expr: 'appcat:raw:billing{type!="dbaas"}',
+            record: 'appcat:billing',
+          },
+        ],
+      },
+    ],
+  },
+};
 
+local orgOverride = (
+  if params.appuioManaged
+  then
+    [ '--organizationOverride', params.tenantID ]
+  else
+    []
+);
+
+(if params.exoscale.enabled || params.cloudscale.enabled then {
+   promRule: promRule,
+ } else {}) +
 (if params.exoscale.enabled then {
    local secrets = params.secrets.exoscale,
+   local intervall = std.toString(params.exoscale.intervall),
+   local name = 'exoscale',
+   local sa = serviceAccount(name, exoClusterRole),
    assert secrets != null : 'secrets must be set.',
    assert secrets.credentials != null : 'secrets.credentials must be set.',
    assert secrets.credentials.stringData != null : 'secrets.credentials.stringData must be set.',
    assert secrets.credentials.stringData.EXOSCALE_API_KEY != null : 'secrets.credentials.stringData.EXOSCALE_API_KEY must be set.',
    assert secrets.credentials.stringData.EXOSCALE_API_SECRET != null : 'secrets.credentials.stringData.EXOSCALE_API_SECRET must be set.',
-   assert secrets.credentials.stringData.KUBERNETES_SERVER_URL != null : 'secrets.credentials.stringData.KUBERNETES_SERVER_URL must be set.',
-   assert secrets.credentials.stringData.KUBERNETES_SERVER_TOKEN != null : 'secrets.credentials.stringData.KUBERNETES_SERVER_TOKEN must be set.',
 
-   secrets: std.filter(function(it) it != null, secret('exoscale')),
-   objectStorageCronjob: cronjob(alias + '-objectstorage', [ 'exoscale', 'objectstorage' ], params.exoscale.objectStorage.schedule),
-   [if params.exoscale.dbaas.enabled then 'dbaasCronjob']: cronjob(alias + '-dbaas', [ 'exoscale', 'dbaas' ], params.exoscale.dbaas.schedule),
+   exoSecrets: std.filter(function(it) it != null, secret(name)),
+   exoPodMonitor: podMonitor(name),
+   exoClusterRole: exoClusterRole,
+   exoServiceAccount: sa.sa,
+   exoRoleBinding: sa.rb,
+   exoscaleExporter: deployment(name, orgOverride + [ '--collectInterval', intervall, name ]),
  } else {})
 +
 (if params.cloudscale.enabled then {
    local secrets = params.secrets.cloudscale,
+   local intervall = std.toString(params.cloudscale.intervall),
+   local name = 'cloudscale',
+   local sa = serviceAccount(name, cloudscaleClusterRole),
    assert secrets != null : 'secrets must be set.',
    assert secrets.credentials != null : 'secrets.credentials must be set.',
    assert secrets.credentials.stringData != null : 'secrets.credentials.stringData must be set.',
    assert secrets.credentials.stringData.CLOUDSCALE_API_TOKEN != null : 'secrets.credentials.stringData.CLOUDSCALE_API_TOKEN must be set.',
-   assert secrets.credentials.stringData.KUBERNETES_SERVER_URL != null : 'secrets.credentials.stringData.KUBERNETES_SERVER_URL must be set.',
-   assert secrets.credentials.stringData.KUBERNETES_SERVER_TOKEN != null : 'secrets.credentials.stringData.KUBERNETES_SERVER_TOKEN must be set.',
 
-   secrets: std.filter(function(it) it != null, secret('cloudscale')),
-   [if params.cloudscale.objectStorage.enabled then 'objectStorageCronjob']: cronjob(alias + '-objectstorage', [ 'cloudscale', 'objectstorage' ], params.cloudscale.objectStorage.schedule),
+   cloudscaleSecrets: std.filter(function(it) it != null, secret(name)),
+   cloudscalePodMonitor: podMonitor(name),
+   cloudscaleClusterRole: cloudscaleClusterRole,
+   cloudscaleServiceAccount: sa.sa,
+   cloudscaleRolebinding: sa.rb,
+   cloudscaleExporter: deployment(name, orgOverride + [ '--collectInterval', intervall, name ]),
  } else {})
