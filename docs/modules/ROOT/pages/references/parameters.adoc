@@ -27,15 +27,52 @@ default::
 +
 [source,yaml]
 ----
-host: null
-port: 5432
-name: appuio-cloud-reporting
-username: appuio-cloud-reporting
-password: null
-parameters: ''
+database: ${appuio_cloud_reporting:database}
 ----
 
-Dictionary managing the connection to the reporting database.
+See https://hub.syn.tools/appuio-cloud-reporting/references/parameters.html#_database[appuio-cloud-reporting docs] for reference.
+
+
+== `database_secret`
+
+[horizontal]
+type:: dictionary
+default::
++
+[source,yaml]
+----
+database_secret: ${appuio_cloud_reporting:database_secret}
+----
+
+See https://hub.syn.tools/appuio-cloud-reporting/references/parameters.html#_database_secret[appuio-cloud-reporting docs] for reference.
+
+== `database_env`
+
+[horizontal]
+type:: dictionary
+default::
++
+[source,yaml]
+----
+database_env: ${appuio_cloud_reporting:database_env}
+----
+
+See https://hub.syn.tools/appuio-cloud-reporting/references/parameters.html#_database_env[appuio-cloud-reporting docs] for reference.
+
+
+== `extra_volumes`
+
+[horizontal]
+type:: dictionary
+default::
++
+[source,yaml]
+----
+extra_volumes: ${appuio_cloud_reporting:extra_volumes}
+----
+
+See https://hub.syn.tools/appuio-cloud-reporting/references/parameters.html#_extra_volumes[appuio-cloud-reporting docs] for reference.
+
 
 == `images`
 

@@ -9,6 +9,7 @@ local alias_suffix = '-' + alias;
 local credentials_secret_name = 'credentials' + alias_suffix;
 local component_name = 'billing-collector-cloudservices';
 
+assert std.member(inv.applications, 'appuio-cloud-reporting') : 'Component appuio-cloud-reporting must be installed';
 
 local labels = {
   'app.kubernetes.io/name': component_name,
@@ -25,6 +26,35 @@ local secret(key) = [
       },
     } + com.makeMergeable(params.secrets[key][s])
   for s in std.objectFields(params.secrets[key])
+];
+
+local dbEnv = [
+  {
+    name: name,
+    valueFrom: {
+      secretKeyRef: {
+        name: params.cloud_reporting_dbsecret_name,
+        key: name,
+      },
+    },
+  }
+  for name in std.objectFields(params.database_secret)
+] + [
+  {
+    name: name,
+    [if std.type(params.database_env[name]) == 'string' then 'value' else 'valueFrom']: params.database_env[name],
+  }
+  for name in std.objectFields(params.database_env)
+] + [
+  assert params.database.url != null : 'database.url must be set.';
+  {
+    name: 'DB_PARAMS',
+    value: params.database.parameters,
+  },
+  {
+    name: 'ACR_DB_URL',
+    value: params.database.url,
+  },
 ];
 
 local cronjob(name, args, schedule) = {
@@ -55,32 +85,17 @@ local cronjob(name, args, schedule) = {
                     },
                   },
                 ],
-                env: [
-                  {
-                    name: 'password',
-                    valueFrom: {
-                      secretKeyRef: {
-                        key: 'password',
-                        name: 'reporting-db',
-                      },
-                    },
-                  },
-                  {
-                    name: 'username',
-                    valueFrom: {
-                      secretKeyRef: {
-                        key: 'username',
-                        name: 'reporting-db',
-                      },
-                    },
-                  },
-                  {
-                    name: 'ACR_DB_URL',
-                    value: 'postgres://$(username):$(password)@%(host)s:%(port)s/%(name)s?%(parameters)s' % params.database,
-                  },
-                ],
+                env: dbEnv,
                 resources: {},
+                [if std.length(params.extra_volumes) > 0 then 'volumeMounts']: [
+                  { name: name } + params.extra_volumes[name].mount_spec
+                  for name in std.objectFields(params.extra_volumes)
+                ],
               },
+            ],
+            [if std.length(params.extra_volumes) > 0 then 'volumes']: [
+              { name: name } + params.extra_volumes[name].volume_spec
+              for name in std.objectFields(params.extra_volumes)
             ],
           },
         },
