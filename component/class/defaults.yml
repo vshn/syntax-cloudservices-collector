@@ -4,7 +4,13 @@ parameters:
       multi_instance: true
 
     namespace: appuio-cloud-reporting
-    database: {}
+
+    database: ${appuio_cloud_reporting:database}
+    database_secret: ${appuio_cloud_reporting:database_secret}
+    database_env: ${appuio_cloud_reporting:database_env}
+    extra_volumes: ${appuio_cloud_reporting:extra_volumes}
+
+    cloud_reporting_dbsecret_name: reporting-db
 
     secrets:
       exoscale:
