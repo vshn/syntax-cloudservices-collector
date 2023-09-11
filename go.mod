@@ -6,8 +6,8 @@ require (
 	github.com/appuio/appuio-cloud-reporting v0.10.0
 	github.com/cloudscale-ch/cloudscale-go-sdk/v2 v2.1.0
 	github.com/exoscale/egoscale v0.90.1
-	github.com/go-logr/logr v1.2.3
-	github.com/go-logr/zapr v1.2.3
+	github.com/go-logr/logr v1.2.4
+	github.com/go-logr/zapr v1.2.4
 	github.com/google/uuid v1.3.0
 	github.com/jackc/pgx/v4 v4.18.1
 	github.com/jmoiron/sqlx v1.3.5
