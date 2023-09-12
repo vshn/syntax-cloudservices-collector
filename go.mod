@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/jackc/pgx/v4 v4.18.1
 	github.com/jmoiron/sqlx v1.3.5
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.24.4
 	github.com/vshn/provider-cloudscale v0.5.0
 	github.com/vshn/provider-exoscale v0.8.1
