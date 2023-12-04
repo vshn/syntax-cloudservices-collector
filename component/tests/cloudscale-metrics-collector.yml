@@ -1,7 +1,0 @@
-applications:
-  - appuio-cloud-reporting
-
-parameters:
-  billing_collector_cloudservices:
-    cloudscale:
-      enabled: true

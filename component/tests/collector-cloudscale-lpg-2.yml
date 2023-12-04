@@ -1,7 +1,0 @@
-applications:
-  - metrics-collector as collector-cloudscale-lpg-2
-
-parameters:
-  billing_collector_cloudservices:
-    exoscale:
-      enabled: true

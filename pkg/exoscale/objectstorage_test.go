@@ -78,7 +78,7 @@ func TestObjectStorage_GetAggregated(t *testing.T) {
 			ctx := getTestContext(t)
 
 			// When
-			aggregated := getAggregatedBuckets(ctx, tc.givenSosBucketsUsage, tc.givenBucketDetails, 1)
+			aggregated := getOdooMeteredBillingRecords(ctx, tc.givenSosBucketsUsage, tc.givenBucketDetails, 1)
 
 			// Then
 			assert.Equal(t, tc.expectedAggregated, aggregated)

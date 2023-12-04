@@ -1,6 +1,0 @@
-parameters:
-  billing_collector_cloudservices:
-    exoscale:
-      enabled: true
-      dbaas:
-        enabled: true

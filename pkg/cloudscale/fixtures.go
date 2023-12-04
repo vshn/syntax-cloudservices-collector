@@ -3,9 +3,9 @@ package cloudscale
 const (
 	// source format: 'query:zone:tenant:namespace' or 'query:zone:tenant:namespace:class'
 	// We do not have real (prometheus) queries here, just random hardcoded strings.
-	sourceQueryStorage    = "appcat_object-storage-storage"
-	sourceQueryTrafficOut = "appcat_object-storage-traffic-out"
-	sourceQueryRequests   = "appcat_object-storage-requests"
+	productIdStorage       = "appcat-cloudscale-object-storage-storage"
+	productIdTrafficOut    = "appcat-cloudscale-object-storage-traffic-out"
+	productIdQueryRequests = "appcat_object-storage-requests"
 )
 
 var (
@@ -15,7 +15,7 @@ var (
 )
 
 var units = map[string]string{
-	sourceQueryStorage:    "GBDay",
-	sourceQueryTrafficOut: "GB",
-	sourceQueryRequests:   "KReq",
+	productIdStorage:       "GBDay",
+	productIdTrafficOut:    "GB",
+	productIdQueryRequests: "KReq",
 }

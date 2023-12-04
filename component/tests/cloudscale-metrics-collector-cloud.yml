@@ -1,0 +1,10 @@
+applications:
+  - appuio-cloud-reporting
+
+parameters:
+  billing_collector_cloudservices:
+    appuioCloud:
+      enabled: true
+      promUrl: localhost:9090
+    cloudscale:
+      enabled: true

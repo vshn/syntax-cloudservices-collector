@@ -3,29 +3,190 @@ package cloudscale
 import (
 	"context"
 	"errors"
+	"fmt"
+	apiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/vshn/billing-collector-cloudservices/pkg/kubernetes"
+	"github.com/vshn/billing-collector-cloudservices/pkg/log"
+	"github.com/vshn/billing-collector-cloudservices/pkg/odoo"
+	"github.com/vshn/billing-collector-cloudservices/pkg/prom"
+	cloudscalev1 "github.com/vshn/provider-cloudscale/apis/cloudscale/v1"
 	"time"
 
 	"github.com/cloudscale-ch/cloudscale-go-sdk/v2"
-	"github.com/vshn/billing-collector-cloudservices/pkg/prom"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type ObjectStorage struct {
-	client      *cloudscale.Client
-	k8sClient   client.Client
-	orgOverride string
+type BucketDetail struct {
+	Namespace string
+	Zone      string
 }
 
-func NewObjectStorage(client *cloudscale.Client, k8sClient client.Client, orgOverride string) (*ObjectStorage, error) {
+type ObjectStorage struct {
+	client       *cloudscale.Client
+	k8sClient    client.Client
+	promClient   apiv1.API
+	salesOrderId string
+	clusterId    string
+}
+
+const (
+	organizationLabel = "appuio.io/organization"
+	namespaceLabel    = "crossplane.io/claim-namespace"
+)
+
+func NewObjectStorage(client *cloudscale.Client, k8sClient client.Client, promClient apiv1.API, salesOrderId, clusterId string) (*ObjectStorage, error) {
 	return &ObjectStorage{
-		client:      client,
-		k8sClient:   k8sClient,
-		orgOverride: orgOverride,
+		client:       client,
+		k8sClient:    k8sClient,
+		promClient:   promClient,
+		salesOrderId: salesOrderId,
+		clusterId:    clusterId,
 	}, nil
 }
 
-func (obj *ObjectStorage) Accumulate(ctx context.Context, date time.Time) (map[AccumulateKey]uint64, error) {
-	return accumulateBucketMetrics(ctx, date, obj.client, obj.k8sClient, obj.orgOverride)
+func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) ([]odoo.OdooMeteredBillingRecord, error) {
+	logger := log.Logger(ctx)
+
+	logger.V(1).Info("fetching bucket metrics from cloudscale", "date", billingDate)
+
+	bucketMetricsRequest := cloudscale.BucketMetricsRequest{Start: billingDate, End: billingDate}
+	bucketMetrics, err := o.client.Metrics.GetBucketMetrics(ctx, &bucketMetricsRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch organisations in case salesOrderId is missing
+	var nsTenants map[string]string
+	if o.salesOrderId == "" {
+		logger.V(1).Info("Sales order id is missing, fetching namespaces to get the associated org id")
+		nsTenants, err = kubernetes.FetchNamespaceWithOrganizationMap(ctx, o.k8sClient)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	logger.V(1).Info("fetching buckets")
+
+	buckets, err := fetchBuckets(ctx, o.k8sClient)
+	if err != nil {
+		return nil, err
+	}
+
+	allRecords := make([]odoo.OdooMeteredBillingRecord, 0)
+	for _, bucketMetricsData := range bucketMetrics.Data {
+		name := bucketMetricsData.Subject.BucketName
+		logger = logger.WithValues("bucket", name)
+		bd, ok := buckets[name]
+		if !ok {
+			logger.Info("unable to sync bucket, ObjectBucket not found")
+			continue
+		}
+		appuioManaged := true
+		if o.salesOrderId == "" {
+			appuioManaged = false
+			o.salesOrderId, err = prom.GetSalesOrderId(ctx, o.promClient, nsTenants[bd.Namespace])
+			if err != nil {
+				logger.Error(err, "unable to sync bucket", "namespace", bd.Namespace)
+				continue
+			}
+		}
+		records, err := createOdooRecord(bucketMetricsData, bd, appuioManaged, o.salesOrderId, o.clusterId)
+		if err != nil {
+			logger.Error(err, "unable to create Odoo Record", "namespace", bd.Namespace)
+			continue
+		}
+		allRecords = append(allRecords, records...)
+		logger.V(1).Info("Created Odoo records", "namespace", bd.Namespace, "records", records)
+	}
+
+	return allRecords, nil
+}
+
+func createOdooRecord(bucketMetricsData cloudscale.BucketMetricsData, b BucketDetail, appuioManaged bool, salesOrderId, clusterId string) ([]odoo.OdooMeteredBillingRecord, error) {
+	if len(bucketMetricsData.TimeSeries) != 1 {
+		return nil, fmt.Errorf("there must be exactly one metrics data point, found %d", len(bucketMetricsData.TimeSeries))
+	}
+
+	storageBytesValue, err := convertUnit(units[productIdStorage], uint64(bucketMetricsData.TimeSeries[0].Usage.StorageBytes))
+	if err != nil {
+		return nil, err
+	}
+	trafficOutValue, err := convertUnit(units[productIdTrafficOut], uint64(bucketMetricsData.TimeSeries[0].Usage.SentBytes))
+	if err != nil {
+		return nil, err
+	}
+	queryRequestsValue, err := convertUnit(units[productIdQueryRequests], uint64(bucketMetricsData.TimeSeries[0].Usage.SentBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	itemGroup := ""
+	if appuioManaged {
+		itemGroup = fmt.Sprintf("APPUiO Managed - Zone: %s / Namespace: %s", clusterId, b.Namespace)
+	} else {
+		itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", clusterId, b.Namespace)
+	}
+
+	instanceId := fmt.Sprintf("%s/%s", b.Zone, bucketMetricsData.Subject.BucketName)
+
+	return []odoo.OdooMeteredBillingRecord{
+		{
+			ProductID:            productIdStorage,
+			InstanceID:           instanceId,
+			ItemDescription:      "AppCat Cloudscale ObjectStorage",
+			ItemGroupDescription: itemGroup,
+			SalesOrderID:         salesOrderId,
+			UnitID:               units[productIdStorage],
+			ConsumedUnits:        storageBytesValue,
+			TimeRange: odoo.TimeRange{
+				From: bucketMetricsData.TimeSeries[0].Start,
+				To:   bucketMetricsData.TimeSeries[0].End,
+			},
+		},
+		{
+			ProductID:            productIdTrafficOut,
+			InstanceID:           instanceId,
+			ItemDescription:      "AppCat Cloudscale ObjectStorage",
+			ItemGroupDescription: itemGroup,
+			SalesOrderID:         salesOrderId,
+			UnitID:               units[productIdTrafficOut],
+			ConsumedUnits:        trafficOutValue,
+			TimeRange: odoo.TimeRange{
+				From: bucketMetricsData.TimeSeries[0].Start,
+				To:   bucketMetricsData.TimeSeries[0].End,
+			},
+		},
+		{
+			ProductID:            productIdQueryRequests,
+			InstanceID:           instanceId,
+			ItemDescription:      "AppCat Cloudscale ObjectStorage",
+			ItemGroupDescription: itemGroup,
+			SalesOrderID:         salesOrderId,
+			UnitID:               units[productIdQueryRequests],
+			ConsumedUnits:        queryRequestsValue,
+			TimeRange: odoo.TimeRange{
+				From: bucketMetricsData.TimeSeries[0].Start,
+				To:   bucketMetricsData.TimeSeries[0].End,
+			},
+		},
+	}, nil
+}
+
+func fetchBuckets(ctx context.Context, k8sclient client.Client) (map[string]BucketDetail, error) {
+	buckets := &cloudscalev1.BucketList{}
+	if err := k8sclient.List(ctx, buckets, client.HasLabels{namespaceLabel}); err != nil {
+		return nil, fmt.Errorf("bucket list: %w", err)
+	}
+
+	bucketDetails := map[string]BucketDetail{}
+	for _, b := range buckets.Items {
+		var bd BucketDetail
+		bd.Namespace = b.Labels[namespaceLabel]
+		bd.Zone = b.Spec.ForProvider.Region
+		bucketDetails[b.GetBucketName()] = bd
+
+	}
+	return bucketDetails, nil
 }
 
 func convertUnit(unit string, value uint64) (float64, error) {
@@ -36,20 +197,4 @@ func convertUnit(unit string, value uint64) (float64, error) {
 		return float64(value) / 1000, nil
 	}
 	return 0, errors.New("Unknown query unit " + unit)
-}
-
-func Export(metrics map[AccumulateKey]uint64, billingHour int) error {
-	prom.ResetAppCatMetric()
-
-	billingParts := 24 - billingHour
-
-	for k, v := range metrics {
-		value, err := convertUnit(units[k.Query], v)
-		if err != nil {
-			return err
-		}
-		value = value / float64(billingParts)
-		prom.UpdateAppCatMetric(value, k.GetCategoryString(), k.GetSourceString(), "objectStorage")
-	}
-	return nil
 }

@@ -49,7 +49,7 @@ const (
 	defaultUnitDBaaS     = "Instances"
 )
 
-// BillingTypes contains exoscale service types to Query billing Database types
+// BillingTypes contains exoscale service types to ProductId billing Database types
 var BillingTypes = map[string]string{
 	"pg":         queryDBaaSPostgres,
 	"mysql":      queryDBaaSMysql,

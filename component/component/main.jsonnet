@@ -6,7 +6,6 @@ local com = import 'lib/commodore.libjsonnet';
 local collectorImage = '%(registry)s/%(repository)s:%(tag)s' % params.images.collector;
 local component_name = 'billing-collector-cloudservices';
 
-
 local labels = {
   'app.kubernetes.io/name': component_name,
   'app.kubernetes.io/managed-by': 'commodore',
@@ -14,13 +13,13 @@ local labels = {
   'app.kubernetes.io/component': component_name,
 };
 
-local secret(key) = [
+local secret(key, suf) = [
   if params.secrets[key][s] != null then
-    kube.Secret(s + '-' + key) {
+    kube.Secret(s + '-' + key + if suf != '' then '-' + suf else '') {
       metadata+: {
         namespace: params.namespace,
       },
-    } + com.makeMergeable(params.secrets[key][s])
+    } + com.makeMergeable(params.secrets[key][s]) + com.makeMergeable(params.secrets['odoo'][s])
   for s in std.objectFields(params.secrets[key])
 ];
 
@@ -32,7 +31,32 @@ local healthProbe = {
   periodSeconds: 30,
 };
 
-local exoClusterRole = kube.ClusterRole('appcat:cloudcollector:exoscale') + {
+local exoDbaasClusterRole = kube.ClusterRole('appcat:cloudcollector:exoscale:dbaas') + {
+  rules: [
+    {
+      apiGroups: [ '*' ],
+      resources: [ 'namespaces' ],
+      verbs: [ 'get', 'list' ],
+    },
+    {
+      apiGroups: [ 'exoscale.crossplane.io' ],
+      resources: [
+        'postgresqls',
+        'mysqls',
+        'redis',
+        'opensearches',
+        'kafkas',
+      ],
+      verbs: [
+        'get',
+        'list',
+        'watch',
+      ],
+    },
+  ],
+};
+
+local exoObjectStorageClusterRole = kube.ClusterRole('appcat:cloudcollector:exoscale:objectstorage') + {
   rules: [
     {
       apiGroups: [ '*' ],
@@ -43,11 +67,6 @@ local exoClusterRole = kube.ClusterRole('appcat:cloudcollector:exoscale') + {
       apiGroups: [ 'exoscale.crossplane.io' ],
       resources: [
         'buckets',
-        'postgresqls',
-        'mysqls',
-        'redis',
-        'opensearches',
-        'kafkas',
       ],
       verbs: [
         'get',
@@ -93,7 +112,7 @@ local serviceAccount(name, clusterRole) = {
   rb: rb,
 };
 
-local deployment(name, args) =
+local deployment(name, args, cm) =
   kube.Deployment(name) {
     metadata+: {
       labels+: labels,
@@ -109,6 +128,11 @@ local deployment(name, args) =
               image: collectorImage,
               args: args,
               envFrom: [
+                {
+                  configMapRef: {
+                    name: cm,
+                  },
+                },
                 {
                   secretRef: {
                     name: 'credentials-' + name,
@@ -129,92 +153,103 @@ local deployment(name, args) =
     },
   };
 
-local podMonitor(name) = kube._Object('monitoring.coreos.com/v1', 'PodMonitor', 'hello') + {
+local config(name, extraConfig) = kube.ConfigMap(name) {
   metadata: {
-    name: name + '-podmonitor',
+    name: name,
     namespace: params.namespace,
   },
-  spec: {
-    podMetricsEndpoints: [
-      {
-        port: 'exporter',
-      },
-    ],
-    selector: {
-      matchLabels: {
-        name: name,
-      },
-    },
+  data: {
+    ODOO_URL: std.toString(params.odoo.url),
+    ODOO_OAUTH_TOKEN_URL: std.toString(params.odoo.tokenUrl),
+    CLUSTER_ID: std.toString(params.clusterId),
+    APPUIO_MANAGED_SALES_ORDER: if params.appuioManaged.enabled then std.toString(params.appuioManaged.salesOrder) else '',
+    TENANT_ID: if params.appuioManaged.enabled then std.toString(params.appuioManaged.tenant) else '',
+    PROM_URL: if params.appuioCloud.enabled then std.toString(params.appuioCloud.promUrl) else '',
   },
-};
+} + extraConfig;
 
-local promRule = kube._Object('monitoring.coreos.com/v1', 'PrometheusRule', 'appcat-cloud-billing') {
-  metadata+: {
-    namespace: params.namespace,
-  },
-  spec: {
-    groups: [
-      {
-        name: 'appcat:billing:cloudservices',
-        rules: [
-          {
-            expr: 'max_over_time(appcat:raw:billing{type="dbaas"}[1h])',
-            record: 'appcat:billing',
-          },
-          {
-            expr: 'appcat:raw:billing{type!="dbaas"}',
-            record: 'appcat:billing',
-          },
-        ],
-      },
-    ],
-  },
-};
-
-local orgOverride = (
-  if params.appuioManaged
-  then
-    [ '--organizationOverride', params.tenantID ]
-  else
-    []
-);
-
-(if params.exoscale.enabled || params.cloudscale.enabled then {
-   promRule: promRule,
- } else {}) +
-(if params.exoscale.enabled then {
+({
+    local odoo = params.secrets.odoo,
+    assert odoo.credentials != null : 'odoo.credentials must be set.',
+    assert odoo.credentials.stringData != null : 'odoo.credentials.stringData must be set.',
+    assert odoo.credentials.stringData.ODOO_OAUTH_CLIENT_ID != null : 'odoo.credentials.stringData.ODOO_OAUTH_CLIENT_ID must be set.',
+    assert odoo.credentials.stringData.ODOO_OAUTH_CLIENT_SECRET != null : 'odoo.credentials.stringData.ODOO_OAUTH_CLIENT_SECRET must be set.',
+})
++
+(if params.exoscale.enabled && params.exoscale.dbaas.enabled then {
+   local name = 'exoscale-dbaas',
    local secrets = params.secrets.exoscale,
-   local intervall = std.toString(params.exoscale.intervall),
-   local name = 'exoscale',
-   local sa = serviceAccount(name, exoClusterRole),
+   local sa = serviceAccount(name, exoDbaasClusterRole),
+   local extraConfig = {
+       data+: {
+         COLLECT_INTERVAL: std.toString(params.exoscale.dbaas.collectInterval),
+       }
+   },
+   local cm = config(name + '-env', extraConfig),
+
    assert secrets != null : 'secrets must be set.',
    assert secrets.credentials != null : 'secrets.credentials must be set.',
    assert secrets.credentials.stringData != null : 'secrets.credentials.stringData must be set.',
    assert secrets.credentials.stringData.EXOSCALE_API_KEY != null : 'secrets.credentials.stringData.EXOSCALE_API_KEY must be set.',
    assert secrets.credentials.stringData.EXOSCALE_API_SECRET != null : 'secrets.credentials.stringData.EXOSCALE_API_SECRET must be set.',
 
-   exoSecrets: std.filter(function(it) it != null, secret(name)),
-   exoPodMonitor: podMonitor(name),
-   exoClusterRole: exoClusterRole,
-   exoServiceAccount: sa.sa,
-   exoRoleBinding: sa.rb,
-   exoscaleExporter: deployment(name, orgOverride + [ '--collectInterval', intervall, name ]),
+   exoDbaasSecrets: std.filter(function(it) it != null, secret('exoscale', 'dbaas')),
+   exoDbaasClusterRole: exoDbaasClusterRole,
+   exoDbaasServiceAccount: sa.sa,
+   exoDbaasRoleBinding: sa.rb,
+   exoDbaasConfigMap: cm,
+   exoDbaasExporter: deployment(name, [ 'exoscale', 'dbaas' ], name + '-env'),
+
  } else {})
 +
+(if params.exoscale.enabled && params.exoscale.objectStorage.enabled then {
+   local name = 'exoscale-objectstorage',
+   local secrets = params.secrets.exoscale,
+   local sa = serviceAccount(name, exoObjectStorageClusterRole),
+   local extraConfig = {
+       data+: {
+         COLLECT_INTERVAL: std.toString(params.exoscale.objectStorage.collectInterval),
+         BILLING_HOUR: std.toString(params.exoscale.objectStorage.billingHour),
+       }
+   },
+   local cm = config(name + '-env', extraConfig),
+
+   assert secrets != null : 'secrets must be set.',
+   assert secrets.credentials != null : 'secrets.credentials must be set.',
+   assert secrets.credentials.stringData != null : 'secrets.credentials.stringData must be set.',
+   assert secrets.credentials.stringData.EXOSCALE_API_KEY != null : 'secrets.credentials.stringData.EXOSCALE_API_KEY must be set.',
+   assert secrets.credentials.stringData.EXOSCALE_API_SECRET != null : 'secrets.credentials.stringData.EXOSCALE_API_SECRET must be set.',
+
+   exoObjectStorageSecrets: std.filter(function(it) it != null, secret('exoscale', 'objectstorage')),
+   exoObjectStorageClusterRole: exoObjectStorageClusterRole,
+   exoObjectStorageServiceAccount: sa.sa,
+   exoObjectStorageRoleBinding: sa.rb,
+   exoObjectStorageConfigMap: cm,
+   exoObjectStorageExporter: deployment(name, [ 'exoscale', 'objectstorage' ], name + '-env'),
+
+ } else {})
+ +
 (if params.cloudscale.enabled then {
-   local secrets = params.secrets.cloudscale,
-   local intervall = std.toString(params.cloudscale.intervall),
    local name = 'cloudscale',
+   local secrets = params.secrets.cloudscale,
    local sa = serviceAccount(name, cloudscaleClusterRole),
+   local extraConfig = {
+       data+: {
+         COLLECT_INTERVAL: std.toString(params.cloudscale.collectInterval),
+         BILLING_HOUR: std.toString(params.cloudscale.billingHour),
+       }
+   },
+   local cm = config(name + '-env', extraConfig),
+
    assert secrets != null : 'secrets must be set.',
    assert secrets.credentials != null : 'secrets.credentials must be set.',
    assert secrets.credentials.stringData != null : 'secrets.credentials.stringData must be set.',
    assert secrets.credentials.stringData.CLOUDSCALE_API_TOKEN != null : 'secrets.credentials.stringData.CLOUDSCALE_API_TOKEN must be set.',
 
-   cloudscaleSecrets: std.filter(function(it) it != null, secret(name)),
-   cloudscalePodMonitor: podMonitor(name),
+   cloudscaleSecrets: std.filter(function(it) it != null, secret(name, '')),
    cloudscaleClusterRole: cloudscaleClusterRole,
    cloudscaleServiceAccount: sa.sa,
    cloudscaleRolebinding: sa.rb,
-   cloudscaleExporter: deployment(name, orgOverride + [ '--collectInterval', intervall, name ]),
+   cloudscaleConfigMap: cm,
+   cloudscaleExporter: deployment(name, [ 'cloudscale', 'objectstorage' ], name + '-env'),
  } else {})

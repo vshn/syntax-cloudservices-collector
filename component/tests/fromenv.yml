@@ -3,17 +3,28 @@ applications:
   - metrics-collector as exoscale
 parameters:
   billing_collector_cloudservices:
-    appuioManaged: false
-    exoscale:
+
+    appuioManaged:
       enabled: true
-      intervall: 10
-    cloudscale:
-      enabled: true
-      intervall: 10
+      tenant: ${cluster:name}
+      salesOrder: "12345"
+
+    appuioCloud:
+      enabled: false
+      promUrl: localhost:9090
+
+    clusterId: ${cluster:name}
+
     images:
       collector:
-        tag: latest
+        tag: test
+
     secrets:
+      odoo:
+        credentials:
+          stringData:
+            ODOO_OAUTH_CLIENT_ID: placeholder
+            ODOO_OAUTH_CLIENT_SECRET: placeholder
       cloudscale:
         credentials:
           stringData:
@@ -22,4 +33,14 @@ parameters:
         credentials:
           stringData:
             EXOSCALE_API_KEY: placeholder
-            EXOSCALE_API_SECRET: placeholder
+            EXOSCALE_API_SECRET: placeholder-byW9I6cTHPg
+
+    exoscale:
+      enabled: false
+      dbaas:
+        enabled: false
+      objectStorage:
+        enabled: false
+
+    cloudscale:
+      enabled: true

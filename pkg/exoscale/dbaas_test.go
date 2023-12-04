@@ -39,6 +39,20 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 			},
 		},
 	}
+	record2 := odoo.OdooMeteredBillingRecord{
+		ProductID:  "appcat-exoscale-dbaas-appcat_postgres-business-128",
+		InstanceID: "postgres-def", ItemDescription: "Exoscale DBaaS",
+		ItemGroupDescription: "AppCat Exoscale DBaaS",
+		SalesOrder:           "1234",
+		UnitID:               "",
+		ConsumedUnits:        1,
+		TimeRange: odoo.TimeRange{
+			From: time.Date(now.Year(), now.Month(), now.Day(), now.Hour()-1, 0, 0, 0, now.Location()),
+			To:   time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, now.Location()),
+		},
+	}
+
+	expectedAggregatedOdooRecords := []odoo.OdooMeteredBillingRecord{record1, record2}
 
 	tests := map[string]struct {
 		dbaasDetails            []Detail

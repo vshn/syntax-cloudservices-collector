@@ -1,0 +1,12 @@
+parameters:
+  billing_collector_cloudservices:
+    appuioManaged:
+      enabled: true
+      tenant: ${cluster:name}
+      salesOrder: "12345"
+    exoscale:
+      enabled: true
+      dbaas:
+        enabled: true
+      objectStorage:
+        enabled: true

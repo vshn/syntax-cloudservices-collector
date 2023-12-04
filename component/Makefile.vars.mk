@@ -44,4 +44,4 @@ KUBENT_IMAGE    ?= docker.io/projectsyn/kubent:latest
 KUBENT_DOCKER   ?= $(DOCKER_CMD) $(DOCKER_ARGS) $(root_volume) --entrypoint=/app/kubent $(KUBENT_IMAGE)
 
 instance ?= billing-collector-cloudservices
-test_instances = tests/billing-collector-cloudservices.yml tests/exoscale-metrics-collector.yml tests/collector-cloudscale-lpg-2.yml tests/cloudscale-metrics-collector.yml
+test_instances = tests/billing-collector-cloudservices.yml tests/exoscale-metrics-collector-managed.yml tests/exoscale-metrics-collector-cloud.yml tests/cloudscale-metrics-collector-managed.yml tests/cloudscale-metrics-collector-cloud.yml tests/fromenv.yml
