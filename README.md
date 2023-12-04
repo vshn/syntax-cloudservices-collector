@@ -8,23 +8,35 @@
 [build]: https://github.com/vshn/billing-collector-cloudservices/actions?query=workflow%3ATest
 [releases]: https://github.com/vshn/billing-collector-cloudservices/releases
 
-Batch job to sync usage data from the Exoscale and Cloudscale API to the [APPUiO Cloud reporting](https://github.com/appuio/appuio-cloud-reporting/) database.
+Batch job to sync usage data from the Exoscale and Cloudscale API to Odoo16.
 
-Metrics are collected taking into account product (e.g. `object-storage-storage:exoscale`), source (e.g. `exoscale:namespace`), tenant (as organization) and date time.
+Metrics are collected based on [metered billing data flow](https://docs.central.vshn.ch/metered-billing-data-flow.html)
 
 See the [component documentation](https://hub.syn.tools/billing-collector-cloudservices/index.html) for more information.
+
+## APPUiO Cloud vs APPUiO Managed
+
+The tool operates in 2 modes - APPUiO Cloud and APPUiO Managed. 
+The mode is decided by the environment variable `APPUIO_MANAGED_SALES_ORDER`.
+If the sales order is set, the tool assumes that the whole cluster is APPUiO Managed thus changing the business logic accordingly.
 
 ## Getting started for developers
 
 In order to run this tool, you need
 * Access to the Exoscale and Cloudscale accounts which has the services to be invoiced
 * Access to the Kubernetes cluster which has the claims corresponding to the Exoscale services
+* Access to Odoo16 where to send the metrics data
 
 Get all this (see below), and put it all into an 'env' file:
 
 ```
 export EXOSCALE_API_KEY="..."
 export EXOSCALE_API_SECRET="..."
+export APPUIO_MANAGED_SALES_"..."
+export ODOO_OAUTH_CLIENT_SECRET="..."
+export ODOO_OAUTH_TOKEN_URL="..."
+export ODOO_URL="..."
+export CLUSTER_ID="..."
 ```
 
 Then source the env file and run the client:
@@ -36,9 +48,9 @@ $ make build
 
 Then, run one of the available commands:
 
-* Exoscale:
+* Exoscale DBaaS:
 ```
-$ ./billing-collector-cloudservices exoscale
+$ ./billing-collector-cloudservices exoscale dbaas
 ```
 
 ### Create Resources in Lab Cluster to test metrics collector
@@ -59,9 +71,9 @@ spec:
     name: postgres-connection-details
 ```
 
-Once the database is created and `Ready`, you can run locally the command:
+Once the database is created and `Ready`, you can run locally the command with the required env variables:
 ```
-$ ./billing-collector-cloudservices exoscale
+$ ./billing-collector-cloudservices exoscale dbaas
 ```
 
 The same works for other resources. Just apply the right claim and run the proper command.
