@@ -26,7 +26,7 @@ type ObjectStorage struct {
 	promClient     apiv1.API
 	salesOrderId   string
 	clusterId      string
-	organization   string
+	uomMapping     map[string]string
 }
 
 // BucketDetail a k8s bucket object with relevant data
@@ -35,13 +35,14 @@ type BucketDetail struct {
 }
 
 // NewObjectStorage creates an ObjectStorage with the initial setup
-func NewObjectStorage(exoscaleClient *egoscale.Client, k8sClient k8s.Client, promClient apiv1.API, salesOrderId, clusterId string) (*ObjectStorage, error) {
+func NewObjectStorage(exoscaleClient *egoscale.Client, k8sClient k8s.Client, promClient apiv1.API, salesOrderId, clusterId string, uomMapping map[string]string) (*ObjectStorage, error) {
 	return &ObjectStorage{
 		k8sClient:      k8sClient,
 		exoscaleClient: exoscaleClient,
 		promClient:     promClient,
 		salesOrderId:   salesOrderId,
 		clusterId:      clusterId,
+		uomMapping:     uomMapping,
 	}, nil
 }
 
@@ -69,7 +70,7 @@ func (o *ObjectStorage) getBucketUsage(ctx context.Context, bucketDetails []Buck
 		return nil, err
 	}
 
-	odooMetrics, err := getOdooMeteredBillingRecords(ctx, o.promClient, *resp.JSON200.SosBucketsUsage, bucketDetails, o.salesOrderId, o.clusterId)
+	odooMetrics, err := o.getOdooMeteredBillingRecords(ctx, o.promClient, *resp.JSON200.SosBucketsUsage, bucketDetails)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +82,7 @@ func (o *ObjectStorage) getBucketUsage(ctx context.Context, bucketDetails []Buck
 	return odooMetrics, nil
 }
 
-func getOdooMeteredBillingRecords(ctx context.Context, promClient apiv1.API, sosBucketsUsage []oapi.SosBucketUsage, bucketDetails []BucketDetail, salesOrderId, clusterId string) ([]odoo.OdooMeteredBillingRecord, error) {
+func (o *ObjectStorage) getOdooMeteredBillingRecords(ctx context.Context, promClient apiv1.API, sosBucketsUsage []oapi.SosBucketUsage, bucketDetails []BucketDetail) ([]odoo.OdooMeteredBillingRecord, error) {
 	logger := log.Logger(ctx)
 	logger.Info("Aggregating buckets by namespace")
 
@@ -109,11 +110,11 @@ func getOdooMeteredBillingRecords(ctx context.Context, promClient apiv1.API, sos
 				return nil, err
 			}
 
-			itemGroup := fmt.Sprintf("APPUiO Managed - Zone: %s / Namespace: %s", clusterId, bucketDetail.Namespace)
+			itemGroup := fmt.Sprintf("APPUiO Managed - Zone: %s / Namespace: %s", o.clusterId, bucketDetail.Namespace)
 			instanceId := fmt.Sprintf("%s/%s", bucketDetail.Zone, bucketDetail.BucketName)
-			if salesOrderId == "" {
-				itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", clusterId, bucketDetail.Namespace)
-				salesOrderId, err = prom.GetSalesOrderId(ctx, promClient, bucketDetail.Organization)
+			if o.salesOrderId == "" {
+				itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", o.clusterId, bucketDetail.Namespace)
+				o.salesOrderId, err = prom.GetSalesOrderId(ctx, promClient, bucketDetail.Organization)
 				if err != nil {
 					logger.Error(err, "unable to sync bucket", "namespace", bucketDetail.Namespace)
 					continue
@@ -125,8 +126,8 @@ func getOdooMeteredBillingRecords(ctx context.Context, promClient apiv1.API, sos
 				InstanceID:           instanceId,
 				ItemDescription:      "AppCat Exoscale ObjectStorage",
 				ItemGroupDescription: itemGroup,
-				SalesOrderID:         salesOrderId,
-				UnitID:               exofixtures.DefaultUnitSos,
+				SalesOrderID:         o.salesOrderId,
+				UnitID:               o.uomMapping[odoo.GBDay],
 				ConsumedUnits:        value,
 				TimeRange: odoo.TimeRange{
 					From: billingDate,
@@ -200,9 +201,16 @@ func addOrgAndNamespaceToBucket(ctx context.Context, buckets exoscalev1.BucketLi
 	return bucketDetails
 }
 
+func CheckObjectStorageUOMExistence(mapping map[string]string) error {
+	if mapping[odoo.GBDay] == "" {
+		return fmt.Errorf("missing UOM mapping %s", odoo.GBDay)
+	}
+	return nil
+}
+
 func adjustStorageSizeUnit(value float64) (float64, error) {
 	sosUnit := exofixtures.ObjectStorage.Query.Unit
-	if sosUnit == exofixtures.DefaultUnitSos {
+	if sosUnit == odoo.GBDay {
 		return value / 1024 / 1024 / 1024, nil
 	}
 	return 0, fmt.Errorf("unknown Query unit %s", sosUnit)

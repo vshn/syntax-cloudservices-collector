@@ -1,5 +1,7 @@
 package cloudscale
 
+import "github.com/vshn/billing-collector-cloudservices/pkg/odoo"
+
 const (
 	// source format: 'query:zone:tenant:namespace' or 'query:zone:tenant:namespace:class'
 	// We do not have real (prometheus) queries here, just random hardcoded strings.
@@ -15,7 +17,7 @@ var (
 )
 
 var units = map[string]string{
-	productIdStorage:       "GBDay",
-	productIdTrafficOut:    "GB",
-	productIdQueryRequests: "KReq",
+	productIdStorage:       odoo.GBDay,
+	productIdTrafficOut:    odoo.GB,
+	productIdQueryRequests: odoo.KReq,
 }

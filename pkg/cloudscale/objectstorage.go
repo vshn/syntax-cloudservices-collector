@@ -27,20 +27,21 @@ type ObjectStorage struct {
 	promClient   apiv1.API
 	salesOrderId string
 	clusterId    string
+	uomMapping   map[string]string
 }
 
 const (
-	organizationLabel = "appuio.io/organization"
-	namespaceLabel    = "crossplane.io/claim-namespace"
+	namespaceLabel = "crossplane.io/claim-namespace"
 )
 
-func NewObjectStorage(client *cloudscale.Client, k8sClient client.Client, promClient apiv1.API, salesOrderId, clusterId string) (*ObjectStorage, error) {
+func NewObjectStorage(client *cloudscale.Client, k8sClient client.Client, promClient apiv1.API, salesOrderId, clusterId string, uomMapping map[string]string) (*ObjectStorage, error) {
 	return &ObjectStorage{
 		client:       client,
 		k8sClient:    k8sClient,
 		promClient:   promClient,
 		salesOrderId: salesOrderId,
 		clusterId:    clusterId,
+		uomMapping:   uomMapping,
 	}, nil
 }
 
@@ -90,7 +91,7 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 				continue
 			}
 		}
-		records, err := createOdooRecord(bucketMetricsData, bd, appuioManaged, o.salesOrderId, o.clusterId)
+		records, err := o.createOdooRecord(bucketMetricsData, bd, appuioManaged)
 		if err != nil {
 			logger.Error(err, "unable to create Odoo Record", "namespace", bd.Namespace)
 			continue
@@ -102,7 +103,7 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 	return allRecords, nil
 }
 
-func createOdooRecord(bucketMetricsData cloudscale.BucketMetricsData, b BucketDetail, appuioManaged bool, salesOrderId, clusterId string) ([]odoo.OdooMeteredBillingRecord, error) {
+func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetricsData, b BucketDetail, appuioManaged bool) ([]odoo.OdooMeteredBillingRecord, error) {
 	if len(bucketMetricsData.TimeSeries) != 1 {
 		return nil, fmt.Errorf("there must be exactly one metrics data point, found %d", len(bucketMetricsData.TimeSeries))
 	}
@@ -122,9 +123,9 @@ func createOdooRecord(bucketMetricsData cloudscale.BucketMetricsData, b BucketDe
 
 	itemGroup := ""
 	if appuioManaged {
-		itemGroup = fmt.Sprintf("APPUiO Managed - Zone: %s / Namespace: %s", clusterId, b.Namespace)
+		itemGroup = fmt.Sprintf("APPUiO Managed - Zone: %s / Namespace: %s", o.clusterId, b.Namespace)
 	} else {
-		itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", clusterId, b.Namespace)
+		itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", o.clusterId, b.Namespace)
 	}
 
 	instanceId := fmt.Sprintf("%s/%s", b.Zone, bucketMetricsData.Subject.BucketName)
@@ -135,8 +136,8 @@ func createOdooRecord(bucketMetricsData cloudscale.BucketMetricsData, b BucketDe
 			InstanceID:           instanceId,
 			ItemDescription:      "AppCat Cloudscale ObjectStorage",
 			ItemGroupDescription: itemGroup,
-			SalesOrderID:         salesOrderId,
-			UnitID:               units[productIdStorage],
+			SalesOrderID:         o.salesOrderId,
+			UnitID:               o.uomMapping[units[productIdStorage]],
 			ConsumedUnits:        storageBytesValue,
 			TimeRange: odoo.TimeRange{
 				From: bucketMetricsData.TimeSeries[0].Start,
@@ -148,8 +149,8 @@ func createOdooRecord(bucketMetricsData cloudscale.BucketMetricsData, b BucketDe
 			InstanceID:           instanceId,
 			ItemDescription:      "AppCat Cloudscale ObjectStorage",
 			ItemGroupDescription: itemGroup,
-			SalesOrderID:         salesOrderId,
-			UnitID:               units[productIdTrafficOut],
+			SalesOrderID:         o.salesOrderId,
+			UnitID:               o.uomMapping[units[productIdTrafficOut]],
 			ConsumedUnits:        trafficOutValue,
 			TimeRange: odoo.TimeRange{
 				From: bucketMetricsData.TimeSeries[0].Start,
@@ -161,8 +162,8 @@ func createOdooRecord(bucketMetricsData cloudscale.BucketMetricsData, b BucketDe
 			InstanceID:           instanceId,
 			ItemDescription:      "AppCat Cloudscale ObjectStorage",
 			ItemGroupDescription: itemGroup,
-			SalesOrderID:         salesOrderId,
-			UnitID:               units[productIdQueryRequests],
+			SalesOrderID:         o.salesOrderId,
+			UnitID:               o.uomMapping[units[productIdQueryRequests]],
 			ConsumedUnits:        queryRequestsValue,
 			TimeRange: odoo.TimeRange{
 				From: bucketMetricsData.TimeSeries[0].Start,
@@ -187,6 +188,13 @@ func fetchBuckets(ctx context.Context, k8sclient client.Client) (map[string]Buck
 
 	}
 	return bucketDetails, nil
+}
+
+func CheckUnitExistence(mapping map[string]string) error {
+	if mapping[odoo.GB] == "" || mapping[odoo.GBDay] == "" || mapping[odoo.KReq] == "" {
+		return fmt.Errorf("missing UOM mapping %s, %s or %s", odoo.GB, odoo.GBDay, odoo.KReq)
+	}
+	return nil
 }
 
 func convertUnit(unit string, value uint64) (float64, error) {

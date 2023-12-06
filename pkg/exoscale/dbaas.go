@@ -17,7 +17,6 @@ import (
 )
 
 const productIdPrefix = "appcat-exoscale-dbaas"
-const unit = "Instances"
 
 var (
 	groupVersionKinds = map[string]schema.GroupVersionKind{
@@ -64,25 +63,29 @@ type Detail struct {
 
 // DBaaS provides DBaaS Database info and required clients
 type DBaaS struct {
-	exoscaleClient *egoscale.Client
-	k8sClient      k8s.Client
-	promClient     apiv1.API
-	salesOrderId   string
-	clusterId      string
+	exoscaleClient  *egoscale.Client
+	k8sClient       k8s.Client
+	promClient      apiv1.API
+	salesOrderId    string
+	clusterId       string
+	collectInterval int
+	uomMapping      map[string]string
 }
 
 // NewDBaaS creates a Service with the initial setup
-func NewDBaaS(exoscaleClient *egoscale.Client, k8sClient k8s.Client, promClient apiv1.API, salesOrderId, clusterId string) (*DBaaS, error) {
+func NewDBaaS(exoscaleClient *egoscale.Client, k8sClient k8s.Client, promClient apiv1.API, collectInterval int, salesOrderId, clusterId string, uomMapping map[string]string) (*DBaaS, error) {
 	return &DBaaS{
-		exoscaleClient: exoscaleClient,
-		k8sClient:      k8sClient,
-		promClient:     promClient,
-		salesOrderId:   salesOrderId,
-		clusterId:      clusterId,
+		exoscaleClient:  exoscaleClient,
+		k8sClient:       k8sClient,
+		promClient:      promClient,
+		salesOrderId:    salesOrderId,
+		clusterId:       clusterId,
+		collectInterval: collectInterval,
+		uomMapping:      uomMapping,
 	}, nil
 }
 
-func (ds *DBaaS) GetMetrics(ctx context.Context, collectInterval int, salesOrderId string) ([]odoo.OdooMeteredBillingRecord, error) {
+func (ds *DBaaS) GetMetrics(ctx context.Context) ([]odoo.OdooMeteredBillingRecord, error) {
 	detail, err := ds.fetchManagedDBaaSAndNamespaces(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fetchManagedDBaaSAndNamespaces: %w", err)
@@ -93,7 +96,7 @@ func (ds *DBaaS) GetMetrics(ctx context.Context, collectInterval int, salesOrder
 		return nil, fmt.Errorf("fetchDBaaSUsage: %w", err)
 	}
 
-	return aggregateDBaaS(ctx, ds.promClient, usage, detail, collectInterval, salesOrderId)
+	return ds.aggregateDBaaS(ctx, ds.promClient, usage, detail)
 }
 
 // fetchManagedDBaaSAndNamespaces fetches instances and namespaces from kubernetes cluster
@@ -177,7 +180,7 @@ func (ds *DBaaS) fetchDBaaSUsage(ctx context.Context) ([]*egoscale.DatabaseServi
 }
 
 // aggregateDBaaS aggregates DBaaS services by namespaces and plan
-func aggregateDBaaS(ctx context.Context, promClient apiv1.API, exoscaleDBaaS []*egoscale.DatabaseService, dbaasDetails []Detail, collectInterval int, salesOrderId string) ([]odoo.OdooMeteredBillingRecord, error) {
+func (ds *DBaaS) aggregateDBaaS(ctx context.Context, promClient apiv1.API, exoscaleDBaaS []*egoscale.DatabaseService, dbaasDetails []Detail) ([]odoo.OdooMeteredBillingRecord, error) {
 	logger := log.Logger(ctx)
 	logger.Info("Aggregating DBaaS instances by namespace and plan")
 
@@ -238,4 +241,11 @@ func aggregateDBaaS(ctx context.Context, promClient apiv1.API, exoscaleDBaaS []*
 	}
 
 	return records, nil
+}
+
+func CheckDBaaSUOMExistence(mapping map[string]string) error {
+	if mapping[odoo.InstanceHour] == "" {
+		return fmt.Errorf("missing UOM mapping %s", odoo.InstanceHour)
+	}
+	return nil
 }

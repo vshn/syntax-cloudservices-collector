@@ -34,6 +34,7 @@ func CloudscaleCmds() *cli.Command {
 		salesOrderId      string
 		prometheusURL     string
 		clusterId         string
+		uom               string
 	)
 	return &cli.Command{
 		Name:  "cloudscale",
@@ -59,6 +60,8 @@ func CloudscaleCmds() *cli.Command {
 				EnvVars: []string{"CLUSTER_ID"}, Destination: &clusterId, Required: true, DefaultText: defaultTextForRequiredFlags},
 			&cli.StringFlag{Name: "prom-url", Usage: "Prometheus connection URL in the form of http://host:port, required for APPUiO Cloud",
 				EnvVars: []string{"PROM_URL"}, Destination: &prometheusURL, Value: "http://localhost:9090"},
+			&cli.StringFlag{Name: "uom", Usage: "Unit of measure mapping between cloud services and Odoo16 in json format",
+				EnvVars: []string{"UOM"}, Destination: &uom, Required: true, DefaultText: defaultTextForRequiredFlags},
 			&cli.IntFlag{Name: "collect-interval", Usage: "How often to collect the metrics from the Cloud Service in hours - 1-23",
 				EnvVars: []string{"COLLECT_INTERVAL"}, Destination: &collectInterval, Required: true, DefaultText: defaultTextForRequiredFlags},
 			&cli.IntFlag{Name: "billing-hour", Usage: "At what time to start collect the metrics (ex 6 would start running from 6)",
@@ -68,6 +71,16 @@ func CloudscaleCmds() *cli.Command {
 		Action: func(c *cli.Context) error {
 			logger := log.Logger(c.Context)
 			var wg sync.WaitGroup
+
+			logger.Info("Checking UOM mappings")
+			mapping, err := odoo.LoadUOM(uom)
+			if err != nil {
+				return err
+			}
+			err = cs.CheckUnitExistence(mapping)
+			if err != nil {
+				return err
+			}
 
 			logger.Info("Creating cloudscale client")
 			cloudscaleClient := cloudscale.NewClient(http.DefaultClient)
@@ -94,7 +107,7 @@ func CloudscaleCmds() *cli.Command {
 				return fmt.Errorf("load loaction: %w", err)
 			}
 
-			o, err := cs.NewObjectStorage(cloudscaleClient, k8sClient, promClient, salesOrderId, clusterId)
+			o, err := cs.NewObjectStorage(cloudscaleClient, k8sClient, promClient, salesOrderId, clusterId, mapping)
 			if err != nil {
 				return fmt.Errorf("object storage: %w", err)
 			}

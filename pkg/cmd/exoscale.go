@@ -67,6 +67,8 @@ func ExoscaleCmds() *cli.Command {
 				EnvVars: []string{"CLUSTER_ID"}, Destination: &clusterId, Required: true, DefaultText: defaultTextForRequiredFlags},
 			&cli.StringFlag{Name: "prom-url", Usage: "Prometheus connection URL in the form of http://host:port, required for APPUiO Cloud",
 				EnvVars: []string{"PROM_URL"}, Destination: &prometheusURL, Value: "http://localhost:9090"},
+			&cli.StringFlag{Name: "uom", Usage: "Unit of measure mapping between cloud services and Odoo16 in json format",
+				EnvVars: []string{"UOM"}, Destination: &uom, Required: true, DefaultText: defaultTextForRequiredFlags},
 		},
 		Before: addCommandName,
 		Subcommands: []*cli.Command{
@@ -82,6 +84,16 @@ func ExoscaleCmds() *cli.Command {
 					exoscaleClient, err := exoscale.NewClient(accessKey, secret)
 					if err != nil {
 						return fmt.Errorf("exoscale client: %w", err)
+					}
+
+					logger.Info("Checking UOM mappings")
+					mapping, err := odoo.LoadUOM(uom)
+					if err != nil {
+						return err
+					}
+					err = exoscale.CheckObjectStorageUOMExistence(mapping)
+					if err != nil {
+						return err
 					}
 
 					logger.Info("Creating k8s client")
@@ -100,14 +112,14 @@ func ExoscaleCmds() *cli.Command {
 						}
 					}
 
-					o, err := exoscale.NewObjectStorage(exoscaleClient, k8sClient, promClient, salesOrderId, clusterId)
-					if err != nil {
-						return fmt.Errorf("objectbucket service: %w", err)
-					}
-
 					if collectInterval < 1 || collectInterval > 23 {
 						// Set to run once a day after billingHour in case the collectInterval is out of boundaries
 						collectInterval = 23
+					}
+
+					o, err := exoscale.NewObjectStorage(exoscaleClient, k8sClient, promClient, salesOrderId, clusterId, mapping)
+					if err != nil {
+						return fmt.Errorf("objectbucket service: %w", err)
 					}
 
 					wg.Add(1)
@@ -157,6 +169,16 @@ func ExoscaleCmds() *cli.Command {
 						return fmt.Errorf("exoscale client: %w", err)
 					}
 
+					logger.Info("Checking UOM mappings")
+					mapping, err := odoo.LoadUOM(uom)
+					if err != nil {
+						return err
+					}
+					err = exoscale.CheckDBaaSUOMExistence(mapping)
+					if err != nil {
+						return err
+					}
+
 					logger.Info("Creating k8s client")
 					k8sClient, err := kubernetes.NewClient(kubeconfig)
 					if err != nil {
@@ -183,11 +205,16 @@ func ExoscaleCmds() *cli.Command {
 						collectInterval = 15
 					}
 
+					d, err := exoscale.NewDBaaS(exoscaleClient, k8sClient, promClient, collectInterval, salesOrderId, clusterId, mapping)
+					if err != nil {
+						return fmt.Errorf("dbaas service: %w", err)
+					}
+
 					wg.Add(1)
 					go func() {
 						for {
 							logger.Info("Collecting DBaaS metrics")
-							metrics, err := d.GetMetrics(c.Context, collectInterval, salesOrderId)
+							metrics, err := d.GetMetrics(c.Context)
 							if err != nil {
 								logger.Error(err, "cannot execute dbaas collector")
 								wg.Done()

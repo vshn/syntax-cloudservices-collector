@@ -14,6 +14,13 @@ import (
 	"golang.org/x/oauth2/clientcredentials"
 )
 
+const (
+	GB           = "GB"
+	GBDay        = "GBDay"
+	KReq         = "KReq"
+	InstanceHour = "InstanceHour"
+)
+
 type OdooAPIClient struct {
 	odooURL     string
 	logger      logr.Logger
@@ -83,4 +90,12 @@ func (c OdooAPIClient) SendData(data []OdooMeteredBillingRecord) error {
 	}
 
 	return nil
+}
+
+func LoadUOM(uom string) (m map[string]string, err error) {
+	err = json.Unmarshal([]byte(uom), &m)
+	if err != nil || len(m) == 0 {
+		return nil, fmt.Errorf("no unit of measure found: %v", err)
+	}
+	return m, nil
 }

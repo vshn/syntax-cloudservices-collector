@@ -11,9 +11,8 @@ const (
 	Provider = "exoscale"
 
 	// SosType represents object storage storage type
-	SosType        ObjectType = "appcat_object-storage-storage"
-	QuerySos                  = string(SosType) + ":" + Provider
-	DefaultUnitSos            = "GBDay"
+	SosType  ObjectType = "appcat_object-storage-storage"
+	QuerySos            = string(SosType) + ":" + Provider
 )
 
 var ObjectStorage = InitConfig{
