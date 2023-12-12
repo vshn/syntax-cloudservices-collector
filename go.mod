@@ -8,7 +8,7 @@ require (
 	github.com/exoscale/egoscale v0.90.1
 	github.com/go-logr/logr v1.2.4
 	github.com/go-logr/zapr v1.2.4
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.5.0
 	github.com/jackc/pgx/v4 v4.18.1
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/stretchr/testify v1.8.2
