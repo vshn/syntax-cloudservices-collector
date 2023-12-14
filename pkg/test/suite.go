@@ -13,7 +13,6 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/suite"
 	"github.com/vshn/billing-collector-cloudservices/pkg/log"
-	"github.com/vshn/billing-collector-cloudservices/pkg/prom"
 	"gopkg.in/dnaeon/go-vcr.v3/cassette"
 	"gopkg.in/dnaeon/go-vcr.v3/recorder"
 	corev1 "k8s.io/api/core/v1"
@@ -82,14 +81,6 @@ func (ts *Suite) SetupEnv(crdPaths []string, bindString string) {
 	ts.Env = testEnv
 	ts.Config = config
 	ts.Client = k8sClient
-
-	go func() {
-		assert.NoError(ts.exportMetrics(bindString), "error exportig the metrics")
-	}()
-}
-
-func (ts *Suite) exportMetrics(bindString string) error {
-	return prom.ServeMetrics(ts.Context, bindString)
 }
 
 // RegisterScheme passes the current scheme to the given SchemeBuilder func.
