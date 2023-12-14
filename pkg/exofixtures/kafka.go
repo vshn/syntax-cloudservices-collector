@@ -7,7 +7,7 @@ import (
 )
 
 // KafkaDBaaSType represents kafka DBaaS type
-const KafkaDBaaSType ObjectType = "appcat_kafka"
+const KafkaDBaaSType ObjectType = "kafka"
 
 // Available plans for Kafka
 var kafkaProductDBaaS = []productDBaaS{

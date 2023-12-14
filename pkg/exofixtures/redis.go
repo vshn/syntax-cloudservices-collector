@@ -7,7 +7,7 @@ import (
 )
 
 // RedisDBaaSType represents redis DBaaS type
-const RedisDBaaSType ObjectType = "appcat_redis"
+const RedisDBaaSType ObjectType = "redis"
 
 // Available plans for Redis
 var redisProductDBaaS = []productDBaaS{

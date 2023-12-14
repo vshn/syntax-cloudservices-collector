@@ -3,6 +3,8 @@ package exoscale
 import (
 	"context"
 	"fmt"
+	"time"
+
 	egoscale "github.com/exoscale/egoscale/v2"
 	"github.com/vshn/billing-collector-cloudservices/pkg/controlAPI"
 	"github.com/vshn/billing-collector-cloudservices/pkg/kubernetes"
@@ -12,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8s "sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 const productIdPrefix = "appcat-exoscale-dbaas"
@@ -95,7 +96,7 @@ func (ds *DBaaS) GetMetrics(ctx context.Context) ([]odoo.OdooMeteredBillingRecor
 		return nil, fmt.Errorf("fetchDBaaSUsage: %w", err)
 	}
 
-	return ds.aggregateDBaaS(ctx, ds.promClient, usage, detail)
+	return ds.AggregateDBaaS(ctx, usage, detail)
 }
 
 // fetchManagedDBaaSAndNamespaces fetches instances and namespaces from kubernetes cluster
@@ -178,8 +179,8 @@ func (ds *DBaaS) fetchDBaaSUsage(ctx context.Context) ([]*egoscale.DatabaseServi
 	return databaseServices, nil
 }
 
-// aggregateDBaaS aggregates DBaaS services by namespaces and plan
-func (ds *DBaaS) aggregateDBaaS(ctx context.Context, promClient apiv1.API, exoscaleDBaaS []*egoscale.DatabaseService, dbaasDetails []Detail) ([]odoo.OdooMeteredBillingRecord, error) {
+// AggregateDBaaS aggregates DBaaS services by namespaces and plan
+func (ds *DBaaS) AggregateDBaaS(ctx context.Context, exoscaleDBaaS []*egoscale.DatabaseService, dbaasDetails []Detail) ([]odoo.OdooMeteredBillingRecord, error) {
 	logger := log.Logger(ctx)
 	logger.Info("Aggregating DBaaS instances by namespace and plan")
 
