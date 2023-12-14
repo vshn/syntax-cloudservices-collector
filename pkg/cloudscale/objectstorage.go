@@ -4,16 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	apiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"time"
+
+	"github.com/vshn/billing-collector-cloudservices/pkg/controlAPI"
 	"github.com/vshn/billing-collector-cloudservices/pkg/kubernetes"
 	"github.com/vshn/billing-collector-cloudservices/pkg/log"
 	"github.com/vshn/billing-collector-cloudservices/pkg/odoo"
-	"github.com/vshn/billing-collector-cloudservices/pkg/prom"
 	cloudscalev1 "github.com/vshn/provider-cloudscale/apis/cloudscale/v1"
-	"time"
 
 	"github.com/cloudscale-ch/cloudscale-go-sdk/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8s "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type BucketDetail struct {
@@ -22,26 +23,26 @@ type BucketDetail struct {
 }
 
 type ObjectStorage struct {
-	client       *cloudscale.Client
-	k8sClient    client.Client
-	promClient   apiv1.API
-	salesOrderId string
-	clusterId    string
-	uomMapping   map[string]string
+	client           *cloudscale.Client
+	k8sClient        k8s.Client
+	controlApiClient k8s.Client
+	salesOrder       string
+	clusterId        string
+	uomMapping       map[string]string
 }
 
 const (
 	namespaceLabel = "crossplane.io/claim-namespace"
 )
 
-func NewObjectStorage(client *cloudscale.Client, k8sClient client.Client, promClient apiv1.API, salesOrderId, clusterId string, uomMapping map[string]string) (*ObjectStorage, error) {
+func NewObjectStorage(client *cloudscale.Client, k8sClient k8s.Client, controlApiClient k8s.Client, salesOrder, clusterId string, uomMapping map[string]string) (*ObjectStorage, error) {
 	return &ObjectStorage{
-		client:       client,
-		k8sClient:    k8sClient,
-		promClient:   promClient,
-		salesOrderId: salesOrderId,
-		clusterId:    clusterId,
-		uomMapping:   uomMapping,
+		client:           client,
+		k8sClient:        k8sClient,
+		controlApiClient: controlApiClient,
+		salesOrder:       salesOrder,
+		clusterId:        clusterId,
+		uomMapping:       uomMapping,
 	}, nil
 }
 
@@ -56,9 +57,9 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 		return nil, err
 	}
 
-	// Fetch organisations in case salesOrderId is missing
+	// Fetch organisations in case salesOrder is missing
 	var nsTenants map[string]string
-	if o.salesOrderId == "" {
+	if o.salesOrder == "" {
 		logger.V(1).Info("Sales order id is missing, fetching namespaces to get the associated org id")
 		nsTenants, err = kubernetes.FetchNamespaceWithOrganizationMap(ctx, o.k8sClient)
 		if err != nil {
@@ -83,9 +84,9 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 			continue
 		}
 		appuioManaged := true
-		if o.salesOrderId == "" {
+		if o.salesOrder == "" {
 			appuioManaged = false
-			o.salesOrderId, err = prom.GetSalesOrderId(ctx, o.promClient, nsTenants[bd.Namespace])
+			o.salesOrder, err = controlAPI.GetSalesOrder(ctx, o.controlApiClient, nsTenants[bd.Namespace])
 			if err != nil {
 				logger.Error(err, "unable to sync bucket", "namespace", bd.Namespace)
 				continue
@@ -136,7 +137,7 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 			InstanceID:           instanceId,
 			ItemDescription:      "AppCat Cloudscale ObjectStorage",
 			ItemGroupDescription: itemGroup,
-			SalesOrderID:         o.salesOrderId,
+			SalesOrder:           o.salesOrder,
 			UnitID:               o.uomMapping[units[productIdStorage]],
 			ConsumedUnits:        storageBytesValue,
 			TimeRange: odoo.TimeRange{
@@ -149,7 +150,7 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 			InstanceID:           instanceId,
 			ItemDescription:      "AppCat Cloudscale ObjectStorage",
 			ItemGroupDescription: itemGroup,
-			SalesOrderID:         o.salesOrderId,
+			SalesOrder:           o.salesOrder,
 			UnitID:               o.uomMapping[units[productIdTrafficOut]],
 			ConsumedUnits:        trafficOutValue,
 			TimeRange: odoo.TimeRange{
@@ -162,7 +163,7 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 			InstanceID:           instanceId,
 			ItemDescription:      "AppCat Cloudscale ObjectStorage",
 			ItemGroupDescription: itemGroup,
-			SalesOrderID:         o.salesOrderId,
+			SalesOrder:           o.salesOrder,
 			UnitID:               o.uomMapping[units[productIdQueryRequests]],
 			ConsumedUnits:        queryRequestsValue,
 			TimeRange: odoo.TimeRange{

@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	egoscale "github.com/exoscale/egoscale/v2"
-	apiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/vshn/billing-collector-cloudservices/pkg/controlAPI"
 	"github.com/vshn/billing-collector-cloudservices/pkg/kubernetes"
 	"github.com/vshn/billing-collector-cloudservices/pkg/log"
 	"github.com/vshn/billing-collector-cloudservices/pkg/odoo"
-	"github.com/vshn/billing-collector-cloudservices/pkg/prom"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -61,27 +60,27 @@ type Detail struct {
 	Organization, DBName, Namespace, Plan, Zone, Kind string
 }
 
-// DBaaS provides DBaaS Database info and required clients
+// DBaaS provides DBaaS Odoo info and required clients
 type DBaaS struct {
-	exoscaleClient  *egoscale.Client
-	k8sClient       k8s.Client
-	promClient      apiv1.API
-	salesOrderId    string
-	clusterId       string
-	collectInterval int
-	uomMapping      map[string]string
+	exoscaleClient   *egoscale.Client
+	k8sClient        k8s.Client
+	controlApiClient k8s.Client
+	salesOrder       string
+	clusterId        string
+	collectInterval  int
+	uomMapping       map[string]string
 }
 
 // NewDBaaS creates a Service with the initial setup
-func NewDBaaS(exoscaleClient *egoscale.Client, k8sClient k8s.Client, promClient apiv1.API, collectInterval int, salesOrderId, clusterId string, uomMapping map[string]string) (*DBaaS, error) {
+func NewDBaaS(exoscaleClient *egoscale.Client, k8sClient k8s.Client, controlApiClient k8s.Client, collectInterval int, salesOrder, clusterId string, uomMapping map[string]string) (*DBaaS, error) {
 	return &DBaaS{
-		exoscaleClient:  exoscaleClient,
-		k8sClient:       k8sClient,
-		promClient:      promClient,
-		salesOrderId:    salesOrderId,
-		clusterId:       clusterId,
-		collectInterval: collectInterval,
-		uomMapping:      uomMapping,
+		exoscaleClient:   exoscaleClient,
+		k8sClient:        k8sClient,
+		controlApiClient: controlApiClient,
+		salesOrder:       salesOrder,
+		clusterId:        clusterId,
+		collectInterval:  collectInterval,
+		uomMapping:       uomMapping,
 	}, nil
 }
 
@@ -213,7 +212,7 @@ func (ds *DBaaS) aggregateDBaaS(ctx context.Context, promClient apiv1.API, exosc
 				itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", ds.clusterId, dbaasDetail.Namespace)
 				ds.salesOrder, err = controlAPI.GetSalesOrder(ctx, ds.controlApiClient, dbaasDetail.Organization)
 				if err != nil {
-					logger.Error(err, "Unable to sync DBaaS, cannot get salesOrderId", "namespace", dbaasDetail.Namespace)
+					logger.Error(err, "Unable to sync DBaaS, cannot get salesOrder", "namespace", dbaasDetail.Namespace)
 					continue
 				}
 			}

@@ -1,3 +1,6 @@
+# VSCode
+.vscode/
+
 # Goreleaser
 /dist/
 /.github/release-notes.md

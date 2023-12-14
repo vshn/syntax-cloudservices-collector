@@ -17,26 +17,18 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 	key1 := NewKey("vshn-xyz", "hobbyist-2", string(exofixtures.PostgresDBaaSType))
 	key2 := NewKey("vshn-abc", "business-128", string(exofixtures.PostgresDBaaSType))
 
-	expectedAggregatedDBaaS := map[Key]Aggregated{
-		key1: {
-			Key:   key1,
-			Value: 1,
-			Source: &exofixtures.DBaaSSourceString{
-				Query:        "",
-				Organization: "org1",
-				Namespace:    "vshn-xyz",
-				Plan:         "hobbyist-2",
-			},
-		},
-		key2: {
-			Key:   key2,
-			Value: 1,
-			Source: &exofixtures.DBaaSSourceString{
-				Query:        "",
-				Organization: "org2",
-				Namespace:    "vshn-abc",
-				Plan:         "business-128",
-			},
+	now := time.Now().In(location)
+	record1 := odoo.OdooMeteredBillingRecord{
+		ProductID:            "appcat-exoscale-dbaas-appcat_postgres-hobbyist-2",
+		InstanceID:           "postgres-abc",
+		ItemDescription:      "Exoscale DBaaS",
+		ItemGroupDescription: "AppCat Exoscale DBaaS",
+		SalesOrder:           "1234",
+		UnitID:               "",
+		ConsumedUnits:        1,
+		TimeRange: odoo.TimeRange{
+			From: time.Date(now.Year(), now.Month(), now.Day(), now.Hour()-1, 0, 0, 0, now.Location()),
+			To:   time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, now.Location()),
 		},
 	}
 	record2 := odoo.OdooMeteredBillingRecord{

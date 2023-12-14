@@ -3,16 +3,16 @@ package exoscale
 import (
 	"context"
 	"fmt"
+	"time"
+
 	egoscale "github.com/exoscale/egoscale/v2"
 	"github.com/exoscale/egoscale/v2/oapi"
-	apiv1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/vshn/billing-collector-cloudservices/pkg/controlAPI"
 	"github.com/vshn/billing-collector-cloudservices/pkg/exofixtures"
 	"github.com/vshn/billing-collector-cloudservices/pkg/kubernetes"
 	"github.com/vshn/billing-collector-cloudservices/pkg/log"
 	"github.com/vshn/billing-collector-cloudservices/pkg/odoo"
-	"github.com/vshn/billing-collector-cloudservices/pkg/prom"
 	exoscalev1 "github.com/vshn/provider-exoscale/apis/exoscale/v1"
-	"time"
 
 	k8s "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -21,12 +21,12 @@ const productIdStorage = "appcat-exoscale-object-storage"
 
 // ObjectStorage gathers bucket data from exoscale provider and cluster and saves to the database
 type ObjectStorage struct {
-	k8sClient      k8s.Client
-	exoscaleClient *egoscale.Client
-	promClient     apiv1.API
-	salesOrderId   string
-	clusterId      string
-	uomMapping     map[string]string
+	k8sClient        k8s.Client
+	exoscaleClient   *egoscale.Client
+	controlApiClient k8s.Client
+	salesOrder       string
+	clusterId        string
+	uomMapping       map[string]string
 }
 
 // BucketDetail a k8s bucket object with relevant data
@@ -35,14 +35,14 @@ type BucketDetail struct {
 }
 
 // NewObjectStorage creates an ObjectStorage with the initial setup
-func NewObjectStorage(exoscaleClient *egoscale.Client, k8sClient k8s.Client, promClient apiv1.API, salesOrderId, clusterId string, uomMapping map[string]string) (*ObjectStorage, error) {
+func NewObjectStorage(exoscaleClient *egoscale.Client, k8sClient k8s.Client, controlApiClient k8s.Client, salesOrder, clusterId string, uomMapping map[string]string) (*ObjectStorage, error) {
 	return &ObjectStorage{
-		k8sClient:      k8sClient,
-		exoscaleClient: exoscaleClient,
-		promClient:     promClient,
-		salesOrderId:   salesOrderId,
-		clusterId:      clusterId,
-		uomMapping:     uomMapping,
+		k8sClient:        k8sClient,
+		exoscaleClient:   exoscaleClient,
+		controlApiClient: controlApiClient,
+		salesOrder:       salesOrder,
+		clusterId:        clusterId,
+		uomMapping:       uomMapping,
 	}, nil
 }
 
@@ -70,7 +70,7 @@ func (o *ObjectStorage) getBucketUsage(ctx context.Context, bucketDetails []Buck
 		return nil, err
 	}
 
-	odooMetrics, err := o.getOdooMeteredBillingRecords(ctx, o.promClient, *resp.JSON200.SosBucketsUsage, bucketDetails)
+	odooMetrics, err := o.getOdooMeteredBillingRecords(ctx, *resp.JSON200.SosBucketsUsage, bucketDetails)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (o *ObjectStorage) getBucketUsage(ctx context.Context, bucketDetails []Buck
 	return odooMetrics, nil
 }
 
-func (o *ObjectStorage) getOdooMeteredBillingRecords(ctx context.Context, promClient apiv1.API, sosBucketsUsage []oapi.SosBucketUsage, bucketDetails []BucketDetail) ([]odoo.OdooMeteredBillingRecord, error) {
+func (o *ObjectStorage) getOdooMeteredBillingRecords(ctx context.Context, sosBucketsUsage []oapi.SosBucketUsage, bucketDetails []BucketDetail) ([]odoo.OdooMeteredBillingRecord, error) {
 	logger := log.Logger(ctx)
 	logger.Info("Aggregating buckets by namespace")
 
@@ -112,9 +112,9 @@ func (o *ObjectStorage) getOdooMeteredBillingRecords(ctx context.Context, promCl
 
 			itemGroup := fmt.Sprintf("APPUiO Managed - Zone: %s / Namespace: %s", o.clusterId, bucketDetail.Namespace)
 			instanceId := fmt.Sprintf("%s/%s", bucketDetail.Zone, bucketDetail.BucketName)
-			if o.salesOrderId == "" {
+			if o.salesOrder == "" {
 				itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", o.clusterId, bucketDetail.Namespace)
-				o.salesOrderId, err = prom.GetSalesOrderId(ctx, promClient, bucketDetail.Organization)
+				o.salesOrder, err = controlAPI.GetSalesOrder(ctx, o.controlApiClient, bucketDetail.Organization)
 				if err != nil {
 					logger.Error(err, "unable to sync bucket", "namespace", bucketDetail.Namespace)
 					continue
@@ -126,7 +126,7 @@ func (o *ObjectStorage) getOdooMeteredBillingRecords(ctx context.Context, promCl
 				InstanceID:           instanceId,
 				ItemDescription:      "AppCat Exoscale ObjectStorage",
 				ItemGroupDescription: itemGroup,
-				SalesOrderID:         o.salesOrderId,
+				SalesOrder:           o.salesOrder,
 				UnitID:               o.uomMapping[odoo.GBDay],
 				ConsumedUnits:        value,
 				TimeRange: odoo.TimeRange{

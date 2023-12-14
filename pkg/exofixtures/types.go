@@ -48,7 +48,7 @@ const (
 	defaultUnitDBaaS     = "Instances"
 )
 
-// BillingTypes contains exoscale service types to ProductId billing Database types
+// BillingTypes contains exoscale service types to ProductId billing Odoo types
 var BillingTypes = map[string]string{
 	"pg":         queryDBaaSPostgres,
 	"mysql":      queryDBaaSMysql,

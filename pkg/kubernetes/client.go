@@ -3,6 +3,8 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+
+	orgv1 "github.com/appuio/control-api/apis/organization/v1"
 	"github.com/vshn/billing-collector-cloudservices/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,7 +27,7 @@ const (
 // NewClient creates a k8s client from the server url and token url
 // If kubeconfig (path to it) is supplied, that takes precedence. Its use is mainly for local development
 // since local clusters usually don't have a valid certificate.
-func NewClient(kubeconfig string) (client.Client, error) {
+func NewClient(kubeconfig, url, token string) (client.Client, error) {
 	scheme := runtime.NewScheme()
 	if err := corev1.AddToScheme(scheme); err != nil {
 		return nil, fmt.Errorf("core scheme: %w", err)
@@ -36,17 +38,23 @@ func NewClient(kubeconfig string) (client.Client, error) {
 	if err := cloudscaleapis.AddToScheme(scheme); err != nil {
 		return nil, fmt.Errorf("cloudscale scheme: %w", err)
 	}
+	if err := orgv1.AddToScheme(scheme); err != nil {
+		return nil, fmt.Errorf("control api org scheme: %w", err)
+	}
 
 	var c client.Client
 	var err error
-	if kubeconfig != "" {
-		config, err := restConfig(kubeconfig)
-		if err != nil {
-			return nil, fmt.Errorf("cannot initialize k8s client: %w", err)
-		}
+	config, err := restConfig(kubeconfig, url, token)
+	if err != nil {
+		return nil, fmt.Errorf("cannot initialize k8s client: %w", err)
+	}
+	if kubeconfig != "" || (url != "" && token != "") {
 		c, err = client.New(config, client.Options{
 			Scheme: scheme,
 		})
+		if err != nil {
+			return nil, fmt.Errorf("cannot create new k8s client: %w", err)
+		}
 	} else {
 		c, err = client.New(ctrl.GetConfigOrDie(), client.Options{
 			Scheme: scheme,
@@ -60,8 +68,12 @@ func NewClient(kubeconfig string) (client.Client, error) {
 
 }
 
-func restConfig(kubeconfig string) (*rest.Config, error) {
-	return clientcmd.BuildConfigFromFlags("", kubeconfig)
+func restConfig(kubeconfig string, url string, token string) (*rest.Config, error) {
+	// kubeconfig takes precedence if set.
+	if kubeconfig != "" {
+		return clientcmd.BuildConfigFromFlags("", kubeconfig)
+	}
+	return &rest.Config{Host: url, BearerToken: token}, nil
 }
 
 func FetchNamespaceWithOrganizationMap(ctx context.Context, k8sClient client.Client) (map[string]string, error) {
