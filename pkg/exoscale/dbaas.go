@@ -16,7 +16,7 @@ import (
 	k8s "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const productIdPrefix = "appcat-exoscale-dbaas"
+const productIdPrefix = "appcat-exoscale"
 
 var (
 	groupVersionKinds = map[string]schema.GroupVersionKind{
@@ -218,7 +218,6 @@ func (ds *DBaaS) AggregateDBaaS(ctx context.Context, exoscaleDBaaS []*egoscale.D
 				}
 			}
 
-			// TODO zones and namespaces?
 			o := odoo.OdooMeteredBillingRecord{
 				ProductID:            productIdPrefix + fmt.Sprintf("-%s-%s", *dbaasUsage.Type, *dbaasUsage.Plan),
 				InstanceID:           instanceId,

@@ -19,7 +19,7 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 
 	now := time.Now().In(location)
 	record1 := odoo.OdooMeteredBillingRecord{
-		ProductID:            "appcat-exoscale-dbaas-pg-hobbyist-2",
+		ProductID:            "appcat-exoscale-pg-hobbyist-2",
 		InstanceID:           "ch-gva-2/postgres-abc",
 		ItemDescription:      "Exoscale DBaaS PostgreSQL",
 		ItemGroupDescription: "APPUiO Managed - Zone: c-test1 / Namespace: vshn-xyz",
@@ -32,7 +32,7 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 		},
 	}
 	record2 := odoo.OdooMeteredBillingRecord{
-		ProductID:            "appcat-exoscale-dbaas-pg-business-128",
+		ProductID:            "appcat-exoscale-pg-business-128",
 		InstanceID:           "ch-gva-2/postgres-def",
 		ItemDescription:      "Exoscale DBaaS PostgreSQL",
 		ItemGroupDescription: "APPUiO Managed - Zone: c-test1 / Namespace: vshn-uvw",
