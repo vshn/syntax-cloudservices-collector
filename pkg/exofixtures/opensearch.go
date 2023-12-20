@@ -7,7 +7,7 @@ import (
 )
 
 // OpensearchDBaaSType represents opensearch DBaaS type
-const OpensearchDBaaSType ObjectType = "appcat_opensearch"
+const OpensearchDBaaSType ObjectType = "opesearch"
 
 // Available plans for OpenSearch
 var opensearchProductDBaaS = []productDBaaS{

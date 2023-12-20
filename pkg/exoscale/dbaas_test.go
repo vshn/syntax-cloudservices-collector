@@ -2,37 +2,55 @@ package exoscale
 
 import (
 	"context"
-	"reflect"
 	"testing"
+	"time"
 
 	egoscale "github.com/exoscale/egoscale/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/vshn/billing-collector-cloudservices/pkg/exofixtures"
+	"github.com/vshn/billing-collector-cloudservices/pkg/log"
+	"github.com/vshn/billing-collector-cloudservices/pkg/odoo"
 )
 
 func TestDBaaS_aggregatedDBaaS(t *testing.T) {
-	ctx := context.Background()
+	ctx := getTestContext(t)
 
-	key1 := NewKey("vshn-xyz", "hobbyist-2", string(exofixtures.PostgresDBaaSType))
-	key2 := NewKey("vshn-abc", "business-128", string(exofixtures.PostgresDBaaSType))
+	location, _ := time.LoadLocation("Europe/Zurich")
 
-	expectedAggregatedDBaaS := map[Key]Aggregated{
-		key1: {
-			Key:          key1,
-			Organization: "org1",
-			Value:        1,
+	now := time.Now().In(location)
+	record1 := odoo.OdooMeteredBillingRecord{
+		ProductID:            "appcat-exoscale-pg-hobbyist-2",
+		InstanceID:           "ch-gva-2/postgres-abc",
+		ItemDescription:      "Exoscale DBaaS PostgreSQL",
+		ItemGroupDescription: "APPUiO Managed - Zone: c-test1 / Namespace: vshn-xyz",
+		SalesOrder:           "1234",
+		UnitID:               "",
+		ConsumedUnits:        1,
+		TimeRange: odoo.TimeRange{
+			From: time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, now.Location()).In(time.UTC),
+			To:   time.Date(now.Year(), now.Month(), now.Day(), now.Hour()+1, 0, 0, 0, now.Location()).In(time.UTC),
 		},
-		key2: {
-			Key:          key2,
-			Organization: "org2",
-			Value:        1,
+	}
+	record2 := odoo.OdooMeteredBillingRecord{
+		ProductID:            "appcat-exoscale-pg-business-128",
+		InstanceID:           "ch-gva-2/postgres-def",
+		ItemDescription:      "Exoscale DBaaS PostgreSQL",
+		ItemGroupDescription: "APPUiO Managed - Zone: c-test1 / Namespace: vshn-uvw",
+		SalesOrder:           "1234",
+		UnitID:               "",
+		ConsumedUnits:        1,
+		TimeRange: odoo.TimeRange{
+			From: time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, now.Location()).In(time.UTC),
+			To:   time.Date(now.Year(), now.Month(), now.Day(), now.Hour()+1, 0, 0, 0, now.Location()).In(time.UTC),
 		},
 	}
 
+	expectedAggregatedOdooRecords := []odoo.OdooMeteredBillingRecord{record1, record2}
+
 	tests := map[string]struct {
-		dbaasDetails            []Detail
-		exoscaleDBaaS           []*egoscale.DatabaseService
-		expectedAggregatedDBaaS map[Key]Aggregated
+		dbaasDetails                  []Detail
+		exoscaleDBaaS                 []*egoscale.DatabaseService
+		expectedAggregatedOdooRecords []odoo.OdooMeteredBillingRecord
 	}{
 		"given DBaaS details and Exoscale DBaasS, we should get the ExpectedAggregatedDBaasS": {
 			dbaasDetails: []Detail{
@@ -41,12 +59,14 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 					DBName:       "postgres-abc",
 					Namespace:    "vshn-xyz",
 					Zone:         "ch-gva-2",
+					Kind:         "PostgreSQLList",
 				},
 				{
 					Organization: "org2",
 					DBName:       "postgres-def",
-					Namespace:    "vshn-abc",
+					Namespace:    "vshn-uvw",
 					Zone:         "ch-gva-2",
+					Kind:         "PostgreSQLList",
 				},
 			},
 			exoscaleDBaaS: []*egoscale.DatabaseService{
@@ -61,7 +81,7 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 					Plan: strToPointer("business-128"),
 				},
 			},
-			expectedAggregatedDBaaS: expectedAggregatedDBaaS,
+			expectedAggregatedOdooRecords: expectedAggregatedOdooRecords,
 		},
 		"given DBaaS details and different names in Exoscale DBaasS, we should not get the ExpectedAggregatedDBaasS": {
 			dbaasDetails: []Detail{
@@ -70,12 +90,14 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 					DBName:       "postgres-abc",
 					Namespace:    "vshn-xyz",
 					Zone:         "ch-gva-2",
+					Kind:         "PostgreSQLList",
 				},
 				{
 					Organization: "org2",
 					DBName:       "postgres-def",
 					Namespace:    "vshn-abc",
 					Zone:         "ch-gva-2",
+					Kind:         "PostgreSQLList",
 				},
 			},
 			exoscaleDBaaS: []*egoscale.DatabaseService{
@@ -89,18 +111,27 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 				},
 			},
 
-			expectedAggregatedDBaaS: map[Key]Aggregated{},
+			expectedAggregatedOdooRecords: []odoo.OdooMeteredBillingRecord{},
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			aggregatedDBaaS := aggregateDBaaS(ctx, tc.exoscaleDBaaS, tc.dbaasDetails)
-			assert.True(t, reflect.DeepEqual(tc.expectedAggregatedDBaaS, aggregatedDBaaS))
+			ds, _ := NewDBaaS(nil, nil, nil, 1, "1234", "c-test1", map[string]string{})
+			aggregatedOdooRecords, err := ds.AggregateDBaaS(ctx, tc.exoscaleDBaaS, tc.dbaasDetails)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expectedAggregatedOdooRecords, aggregatedOdooRecords)
 		})
 	}
 }
 
 func strToPointer(s string) *string {
 	return &s
+}
+
+func getTestContext(t assert.TestingT) context.Context {
+	logger, err := log.NewLogger("test", time.Now().String(), 1, "console")
+	assert.NoError(t, err, "cannot create logger")
+	ctx := log.NewLoggingContext(context.Background(), logger)
+	return ctx
 }

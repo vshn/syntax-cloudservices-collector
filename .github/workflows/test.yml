@@ -31,12 +31,3 @@ jobs:
 
       - name: Run tests
         run: make test-integration
-
-  golden:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Golden diff
-        working-directory: component/
-        run: make test golden-diff-all

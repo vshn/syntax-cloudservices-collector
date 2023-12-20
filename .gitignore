@@ -1,3 +1,6 @@
+# VSCode
+.vscode/
+
 # Goreleaser
 /dist/
 /.github/release-notes.md
@@ -17,3 +20,8 @@
 # Configuration
 env
 .env
+
+__debug*
+
+# Golden test that may contain live API keys for local testing
+fromenv/

@@ -5,16 +5,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/appuio/appuio-cloud-reporting/pkg/db"
 	egoscale "github.com/exoscale/egoscale/v2"
-	"github.com/vshn/billing-collector-cloudservices/pkg/exofixtures"
-	"github.com/vshn/billing-collector-cloudservices/pkg/reporting"
+	"github.com/vshn/billing-collector-cloudservices/pkg/controlAPI"
+	"github.com/vshn/billing-collector-cloudservices/pkg/kubernetes"
+	"github.com/vshn/billing-collector-cloudservices/pkg/log"
+	"github.com/vshn/billing-collector-cloudservices/pkg/odoo"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	ctrl "sigs.k8s.io/controller-runtime"
 	k8s "sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const productIdPrefix = "appcat-exoscale"
 
 var (
 	groupVersionKinds = map[string]schema.GroupVersionKind{
@@ -44,6 +46,14 @@ var (
 			Kind:    "KafkaList",
 		},
 	}
+
+	dbaasTypes = map[string]string{
+		"pg":         "PostgreSQL",
+		"mysql":      "MySQL",
+		"opensearch": "OpenSearch",
+		"redis":      "Redis",
+		"kafka":      "Kafka",
+	}
 )
 
 // Detail a helper structure for intermediate operations
@@ -51,61 +61,31 @@ type Detail struct {
 	Organization, DBName, Namespace, Plan, Zone, Kind string
 }
 
-// DBaaS provides DBaaS Database info and required clients
+// DBaaS provides DBaaS Odoo info and required clients
 type DBaaS struct {
-	exoscaleClient *egoscale.Client
-	k8sClient      k8s.Client
-	databaseURL    string
-	billingDate    time.Time
+	exoscaleClient   *egoscale.Client
+	k8sClient        k8s.Client
+	controlApiClient k8s.Client
+	salesOrder       string
+	clusterId        string
+	collectInterval  int
+	uomMapping       map[string]string
 }
 
 // NewDBaaS creates a Service with the initial setup
-func NewDBaaS(exoscaleClient *egoscale.Client, k8sClient k8s.Client, databaseURL string, billingDate time.Time) (*DBaaS, error) {
+func NewDBaaS(exoscaleClient *egoscale.Client, k8sClient k8s.Client, controlApiClient k8s.Client, collectInterval int, salesOrder, clusterId string, uomMapping map[string]string) (*DBaaS, error) {
 	return &DBaaS{
-		exoscaleClient: exoscaleClient,
-		k8sClient:      k8sClient,
-		databaseURL:    databaseURL,
-		billingDate:    billingDate,
+		exoscaleClient:   exoscaleClient,
+		k8sClient:        k8sClient,
+		controlApiClient: controlApiClient,
+		salesOrder:       salesOrder,
+		clusterId:        clusterId,
+		collectInterval:  collectInterval,
+		uomMapping:       uomMapping,
 	}, nil
 }
 
-// Execute executes the main business logic for this application by gathering, matching and saving data to the database
-func (ds *DBaaS) Execute(ctx context.Context) error {
-	logger := ctrl.LoggerFrom(ctx)
-
-	s, err := reporting.NewStore(ds.databaseURL, logger.WithName("reporting-store"))
-	if err != nil {
-		return fmt.Errorf("reporting.NewStore: %w", err)
-	}
-	defer func() {
-		if err := s.Close(); err != nil {
-			logger.Error(err, "unable to close")
-		}
-	}()
-
-	if err := ds.initialize(ctx, s); err != nil {
-		return err
-	}
-	accumulated, err := ds.accumulate(ctx)
-	if err != nil {
-		return err
-	}
-	return ds.save(ctx, s, accumulated)
-}
-
-func (ds *DBaaS) initialize(ctx context.Context, s *reporting.Store) error {
-	logger := ctrl.LoggerFrom(ctx)
-
-	for t, fixtures := range exofixtures.DBaaS {
-		if err := s.Initialize(ctx, fixtures.Products, []*db.Discount{&fixtures.Discount}, []*db.Query{&fixtures.Query}); err != nil {
-			return fmt.Errorf("initialize(%q): %w", t, err)
-		}
-	}
-	logger.Info("initialized reporting db")
-	return nil
-}
-
-func (ds *DBaaS) accumulate(ctx context.Context) (map[Key]Aggregated, error) {
+func (ds *DBaaS) GetMetrics(ctx context.Context) ([]odoo.OdooMeteredBillingRecord, error) {
 	detail, err := ds.fetchManagedDBaaSAndNamespaces(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fetchManagedDBaaSAndNamespaces: %w", err)
@@ -116,31 +96,15 @@ func (ds *DBaaS) accumulate(ctx context.Context) (map[Key]Aggregated, error) {
 		return nil, fmt.Errorf("fetchDBaaSUsage: %w", err)
 	}
 
-	return aggregateDBaaS(ctx, usage, detail), nil
-}
-
-func (ds *DBaaS) save(ctx context.Context, s *reporting.Store, aggregatedObjects map[Key]Aggregated) error {
-	logger := ctrl.LoggerFrom(ctx)
-	if len(aggregatedObjects) == 0 {
-		logger.Info("there are no DBaaS instances to be saved in the database")
-		return nil
-	}
-	for _, aggregated := range aggregatedObjects {
-		err := ds.ensureAggregatedServiceUsage(ctx, aggregated, s)
-		if err != nil {
-			logger.Error(err, "Cannot save aggregated DBaaS service record to billing database")
-			continue
-		}
-	}
-	return nil
+	return ds.AggregateDBaaS(ctx, usage, detail)
 }
 
 // fetchManagedDBaaSAndNamespaces fetches instances and namespaces from kubernetes cluster
 func (ds *DBaaS) fetchManagedDBaaSAndNamespaces(ctx context.Context) ([]Detail, error) {
-	logger := ctrl.LoggerFrom(ctx)
+	logger := log.Logger(ctx)
 
 	logger.V(1).Info("Listing namespaces from cluster")
-	namespaces, err := fetchNamespaceWithOrganizationMap(ctx, ds.k8sClient)
+	namespaces, err := kubernetes.FetchNamespaceWithOrganizationMap(ctx, ds.k8sClient)
 	if err != nil {
 		return nil, fmt.Errorf("cannot list namespaces: %w", err)
 	}
@@ -170,7 +134,7 @@ func (ds *DBaaS) fetchManagedDBaaSAndNamespaces(ctx context.Context) ([]Detail, 
 }
 
 func findDBaaSDetailInNamespacesMap(ctx context.Context, resource metav1.PartialObjectMetadata, gvk schema.GroupVersionKind, namespaces map[string]string) *Detail {
-	logger := ctrl.LoggerFrom(ctx).WithValues("dbaas", resource.GetName())
+	logger := log.Logger(ctx).WithValues("dbaas", resource.GetName())
 
 	namespace, exist := resource.GetLabels()[namespaceLabel]
 	if !exist {
@@ -191,6 +155,7 @@ func findDBaaSDetailInNamespacesMap(ctx context.Context, resource metav1.Partial
 		Kind:         gvk.Kind,
 		Namespace:    namespace,
 		Organization: organization,
+		Zone:         resource.GetAnnotations()["appcat.vshn.io/cloudzone"],
 	}
 
 	logger.V(1).Info("Added namespace and organization to DBaaS", "namespace", dbaasDetail.Namespace, "organization", dbaasDetail.Organization)
@@ -199,7 +164,7 @@ func findDBaaSDetailInNamespacesMap(ctx context.Context, resource metav1.Partial
 
 // fetchDBaaSUsage gets DBaaS service usage from Exoscale
 func (ds *DBaaS) fetchDBaaSUsage(ctx context.Context) ([]*egoscale.DatabaseService, error) {
-	logger := ctrl.LoggerFrom(ctx)
+	logger := log.Logger(ctx)
 	logger.Info("Fetching DBaaS usage from Exoscale")
 
 	var databaseServices []*egoscale.DatabaseService
@@ -214,9 +179,9 @@ func (ds *DBaaS) fetchDBaaSUsage(ctx context.Context) ([]*egoscale.DatabaseServi
 	return databaseServices, nil
 }
 
-// aggregateDBaaS aggregates DBaaS services by namespaces and plan
-func aggregateDBaaS(ctx context.Context, exoscaleDBaaS []*egoscale.DatabaseService, dbaasDetails []Detail) map[Key]Aggregated {
-	logger := ctrl.LoggerFrom(ctx)
+// AggregateDBaaS aggregates DBaaS services by namespaces and plan
+func (ds *DBaaS) AggregateDBaaS(ctx context.Context, exoscaleDBaaS []*egoscale.DatabaseService, dbaasDetails []Detail) ([]odoo.OdooMeteredBillingRecord, error) {
+	logger := log.Logger(ctx)
 	logger.Info("Aggregating DBaaS instances by namespace and plan")
 
 	// The DBaaS names are unique across DB types in an Exoscale organization.
@@ -225,60 +190,61 @@ func aggregateDBaaS(ctx context.Context, exoscaleDBaaS []*egoscale.DatabaseServi
 		dbaasServiceUsageMap[*usage.Name] = *usage
 	}
 
-	aggregatedDBaasS := make(map[Key]Aggregated)
+	location, err := time.LoadLocation("Europe/Zurich")
+	if err != nil {
+		return nil, fmt.Errorf("load loaction: %w", err)
+	}
+
+	now := time.Now().In(location)
+	billingDateStart := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 0, 0, 0, now.Location()).In(time.UTC)
+	billingDateEnd := time.Date(now.Year(), now.Month(), now.Day(), now.Hour()+1, 0, 0, 0, now.Location()).In(time.UTC)
+
+	records := make([]odoo.OdooMeteredBillingRecord, 0)
 	for _, dbaasDetail := range dbaasDetails {
 		logger.V(1).Info("Checking DBaaS", "instance", dbaasDetail.DBName)
 
 		dbaasUsage, exists := dbaasServiceUsageMap[dbaasDetail.DBName]
 		if exists && dbaasDetail.Kind == groupVersionKinds[*dbaasUsage.Type].Kind {
 			logger.V(1).Info("Found exoscale dbaas usage", "instance", dbaasUsage.Name, "instance created", dbaasUsage.CreatedAt)
-			key := NewKey(dbaasDetail.Namespace, *dbaasUsage.Plan, *dbaasUsage.Type)
-			aggregated := aggregatedDBaasS[key]
-			aggregated.Key = key
-			aggregated.Organization = dbaasDetail.Organization
-			aggregated.Value++
-			aggregatedDBaasS[key] = aggregated
+
+			itemGroup := fmt.Sprintf("APPUiO Managed - Zone: %s / Namespace: %s", ds.clusterId, dbaasDetail.Namespace)
+			instanceId := fmt.Sprintf("%s/%s", dbaasDetail.Zone, dbaasDetail.DBName)
+			if ds.salesOrder == "" {
+				itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", ds.clusterId, dbaasDetail.Namespace)
+				ds.salesOrder, err = controlAPI.GetSalesOrder(ctx, ds.controlApiClient, dbaasDetail.Organization)
+				if err != nil {
+					logger.Error(err, "Unable to sync DBaaS, cannot get salesOrder", "namespace", dbaasDetail.Namespace)
+					continue
+				}
+			}
+
+			o := odoo.OdooMeteredBillingRecord{
+				ProductID:            productIdPrefix + fmt.Sprintf("-%s-%s", *dbaasUsage.Type, *dbaasUsage.Plan),
+				InstanceID:           instanceId,
+				ItemDescription:      "Exoscale DBaaS " + dbaasTypes[*dbaasUsage.Type],
+				ItemGroupDescription: itemGroup,
+				SalesOrder:           ds.salesOrder,
+				UnitID:               ds.uomMapping[odoo.InstanceHour],
+				ConsumedUnits:        1,
+				TimeRange: odoo.TimeRange{
+					From: billingDateStart,
+					To:   billingDateEnd,
+				},
+			}
+
+			records = append(records, o)
+
 		} else {
 			logger.Info("Could not find any DBaaS on exoscale", "instance", dbaasDetail.DBName)
 		}
 	}
 
-	return aggregatedDBaasS
+	return records, nil
 }
 
-// ensureAggregatedServiceUsage saves the aggregated database service usage by namespace and plan to the billing database
-// To save the correct data to the database the function also matches a relevant product, Discount (if any) and Query.
-func (ds *DBaaS) ensureAggregatedServiceUsage(ctx context.Context, aggregatedDatabaseService Aggregated, s *reporting.Store) error {
-	logger := ctrl.LoggerFrom(ctx)
-
-	tokens, err := aggregatedDatabaseService.DecodeKey()
-	if err != nil {
-		return fmt.Errorf("cannot decode key namespace-plan-dbtype - %s, organization %s, number of instances %f: %w",
-			aggregatedDatabaseService.Key,
-			aggregatedDatabaseService.Organization,
-			aggregatedDatabaseService.Value,
-			err)
+func CheckDBaaSUOMExistence(mapping map[string]string) error {
+	if mapping[odoo.InstanceHour] == "" {
+		return fmt.Errorf("missing UOM mapping %s", odoo.InstanceHour)
 	}
-	namespace := tokens[0]
-	plan := tokens[1]
-	dbType := tokens[2]
-
-	logger.Info("Saving DBaaS usage", "namespace", namespace, "plan", plan, "type", dbType, "quantity", aggregatedDatabaseService.Value)
-
-	sourceString := exofixtures.DBaaSSourceString{
-		Query:        exofixtures.BillingTypes[dbType],
-		Organization: aggregatedDatabaseService.Organization,
-		Namespace:    namespace,
-		Plan:         plan,
-	}
-
-	return s.WriteRecord(ctx, reporting.Record{
-		TenantSource:   aggregatedDatabaseService.Organization,
-		CategorySource: exofixtures.Provider + ":" + namespace,
-		BillingDate:    ds.billingDate,
-		ProductSource:  sourceString.GetSourceString(),
-		DiscountSource: sourceString.GetSourceString(),
-		QueryName:      sourceString.GetQuery(),
-		Value:          aggregatedDatabaseService.Value,
-	})
+	return nil
 }

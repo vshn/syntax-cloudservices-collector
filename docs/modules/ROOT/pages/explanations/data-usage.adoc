@@ -1,5 +1,7 @@
 = Data Usage
 
+WARNING: This page is outdated and the information below is not correct anymore.
+
 This page gives a brief overview how resources data usage (e.g. buckets) is saved to the postgres billing database.
 
 == Data flow

@@ -11,9 +11,8 @@ const (
 	Provider = "exoscale"
 
 	// SosType represents object storage storage type
-	SosType        ObjectType = "appcat_object-storage-storage"
-	QuerySos                  = string(SosType) + ":" + Provider
-	DefaultUnitSos            = "GBDay"
+	SosType  ObjectType = "appcat_object-storage-storage"
+	QuerySos            = string(SosType) + ":" + Provider
 )
 
 var ObjectStorage = InitConfig{
@@ -49,7 +48,7 @@ const (
 	defaultUnitDBaaS     = "Instances"
 )
 
-// BillingTypes contains exoscale service types to Query billing Database types
+// BillingTypes contains exoscale service types to ProductId billing Odoo types
 var BillingTypes = map[string]string{
 	"pg":         queryDBaaSPostgres,
 	"mysql":      queryDBaaSMysql,
@@ -174,4 +173,21 @@ func (ss DBaaSSourceString) GetQuery() string {
 
 func (ss DBaaSSourceString) GetSourceString() string {
 	return strings.Join([]string{ss.Query, ss.Organization, ss.Namespace, ss.Plan}, ":")
+}
+
+func (ss DBaaSSourceString) GetCategoryString() string {
+	return Provider + ":" + ss.Namespace
+}
+
+type SOSSourceString struct {
+	Namespace    string
+	Organization string
+}
+
+func (ss SOSSourceString) GetSourceString() string {
+	return string(SosType) + ":" + Provider + ":" + ss.Organization + ":" + ss.Namespace
+}
+
+func (ss SOSSourceString) GetCategoryString() string {
+	return Provider + ":" + ss.Namespace
 }

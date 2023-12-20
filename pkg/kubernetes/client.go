@@ -1,7 +1,14 @@
 package kubernetes
 
 import (
+	"context"
 	"fmt"
+
+	orgv1 "github.com/appuio/control-api/apis/organization/v1"
+	"github.com/vshn/billing-collector-cloudservices/pkg/log"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	cloudscaleapis "github.com/vshn/provider-cloudscale/apis"
 	exoapis "github.com/vshn/provider-exoscale/apis"
@@ -10,6 +17,11 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	// OrganizationLabel represents the label used for organization when fetching the metrics
+	OrganizationLabel = "appuio.io/organization"
 )
 
 // NewClient creates a k8s client from the server url and token url
@@ -26,20 +38,34 @@ func NewClient(kubeconfig, url, token string) (client.Client, error) {
 	if err := cloudscaleapis.AddToScheme(scheme); err != nil {
 		return nil, fmt.Errorf("cloudscale scheme: %w", err)
 	}
-
-	config, err := restConfig(kubeconfig, url, token)
-	if err != nil {
-		return nil, fmt.Errorf("k8s rest config: %w", err)
+	if err := orgv1.AddToScheme(scheme); err != nil {
+		return nil, fmt.Errorf("control api org scheme: %w", err)
 	}
 
-	c, err := client.New(config, client.Options{
-		Scheme: scheme,
-	})
+	var c client.Client
+	var err error
+	config, err := restConfig(kubeconfig, url, token)
+	if err != nil {
+		return nil, fmt.Errorf("cannot initialize k8s client: %w", err)
+	}
+	if kubeconfig != "" || (url != "" && token != "") {
+		c, err = client.New(config, client.Options{
+			Scheme: scheme,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("cannot create new k8s client: %w", err)
+		}
+	} else {
+		c, err = client.New(ctrl.GetConfigOrDie(), client.Options{
+			Scheme: scheme,
+		})
+	}
 
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize k8s client: %w", err)
 	}
 	return c, nil
+
 }
 
 func restConfig(kubeconfig string, url string, token string) (*rest.Config, error) {
@@ -48,4 +74,32 @@ func restConfig(kubeconfig string, url string, token string) (*rest.Config, erro
 		return clientcmd.BuildConfigFromFlags("", kubeconfig)
 	}
 	return &rest.Config{Host: url, BearerToken: token}, nil
+}
+
+func FetchNamespaceWithOrganizationMap(ctx context.Context, k8sClient client.Client) (map[string]string, error) {
+	logger := log.Logger(ctx)
+
+	gvk := schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "NamespaceList",
+	}
+	list := &metav1.PartialObjectMetadataList{}
+	list.SetGroupVersionKind(gvk)
+
+	err := k8sClient.List(ctx, list)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get namespace list: %w", err)
+	}
+
+	namespaces := map[string]string{}
+	for _, ns := range list.Items {
+		orgLabel, ok := ns.GetLabels()[OrganizationLabel]
+		if !ok {
+			logger.Info("Organization label not found in namespace", "namespace", ns.GetName())
+			continue
+		}
+		namespaces[ns.GetName()] = orgLabel
+	}
+	return namespaces, nil
 }
