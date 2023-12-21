@@ -17,7 +17,7 @@ import (
 	k8s "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const productIdStorage = "appcat-exoscale-object-storage"
+const productIdStorage = "appcat-exoscale-objectstorage-storage"
 
 // ObjectStorage gathers bucket data from exoscale provider and cluster and saves to the database
 type ObjectStorage struct {
