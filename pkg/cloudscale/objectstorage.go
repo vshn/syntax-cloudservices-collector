@@ -138,7 +138,7 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 		{
 			ProductID:            productIdStorage,
 			InstanceID:           instanceId,
-			ItemDescription:      "AppCat Cloudscale ObjectStorage",
+			ItemDescription:      bucketMetricsData.Subject.BucketName,
 			ItemGroupDescription: itemGroup,
 			SalesOrder:           salesOrder,
 			UnitID:               o.uomMapping[units[productIdStorage]],

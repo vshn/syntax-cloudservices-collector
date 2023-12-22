@@ -127,7 +127,7 @@ func (o *ObjectStorage) getOdooMeteredBillingRecords(ctx context.Context, sosBuc
 			o := odoo.OdooMeteredBillingRecord{
 				ProductID:            productIdStorage,
 				InstanceID:           instanceId,
-				ItemDescription:      "AppCat Exoscale ObjectStorage",
+				ItemDescription:      bucketDetail.BucketName,
 				ItemGroupDescription: itemGroup,
 				SalesOrder:           salesOrder,
 				UnitID:               o.uomMapping[odoo.GBDay],
