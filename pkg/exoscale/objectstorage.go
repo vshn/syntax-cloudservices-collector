@@ -26,6 +26,7 @@ type ObjectStorage struct {
 	controlApiClient k8s.Client
 	salesOrder       string
 	clusterId        string
+	cloudZone        string
 	uomMapping       map[string]string
 }
 
@@ -35,13 +36,14 @@ type BucketDetail struct {
 }
 
 // NewObjectStorage creates an ObjectStorage with the initial setup
-func NewObjectStorage(exoscaleClient *egoscale.Client, k8sClient k8s.Client, controlApiClient k8s.Client, salesOrder, clusterId string, uomMapping map[string]string) (*ObjectStorage, error) {
+func NewObjectStorage(exoscaleClient *egoscale.Client, k8sClient k8s.Client, controlApiClient k8s.Client, salesOrder, clusterId string, cloudZone string, uomMapping map[string]string) (*ObjectStorage, error) {
 	return &ObjectStorage{
 		k8sClient:        k8sClient,
 		exoscaleClient:   exoscaleClient,
 		controlApiClient: controlApiClient,
 		salesOrder:       salesOrder,
 		clusterId:        clusterId,
+		cloudZone:        cloudZone,
 		uomMapping:       uomMapping,
 	}, nil
 }
@@ -110,11 +112,11 @@ func (o *ObjectStorage) getOdooMeteredBillingRecords(ctx context.Context, sosBuc
 				return nil, err
 			}
 
-			itemGroup := fmt.Sprintf("APPUiO Managed - Zone: %s / Namespace: %s", o.clusterId, bucketDetail.Namespace)
+			itemGroup := fmt.Sprintf("APPUiO Managed - Cluster: %s / Namespace: %s", o.clusterId, bucketDetail.Namespace)
 			instanceId := fmt.Sprintf("%s/%s", bucketDetail.Zone, bucketDetail.BucketName)
 			salesOrder := o.salesOrder
 			if salesOrder == "" {
-				itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", o.clusterId, bucketDetail.Namespace)
+				itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", o.cloudZone, bucketDetail.Namespace)
 				salesOrder, err = controlAPI.GetSalesOrder(ctx, o.controlApiClient, bucketDetail.Organization)
 				if err != nil {
 					logger.Error(err, "unable to sync bucket", "namespace", bucketDetail.Namespace)
