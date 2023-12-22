@@ -84,15 +84,16 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 			continue
 		}
 		appuioManaged := true
-		if o.salesOrder == "" {
+		salesOrder := o.salesOrder
+		if salesOrder == "" {
 			appuioManaged = false
-			o.salesOrder, err = controlAPI.GetSalesOrder(ctx, o.controlApiClient, nsTenants[bd.Namespace])
+			salesOrder, err = controlAPI.GetSalesOrder(ctx, o.controlApiClient, nsTenants[bd.Namespace])
 			if err != nil {
 				logger.Error(err, "unable to sync bucket", "namespace", bd.Namespace)
 				continue
 			}
 		}
-		records, err := o.createOdooRecord(bucketMetricsData, bd, appuioManaged)
+		records, err := o.createOdooRecord(bucketMetricsData, bd, appuioManaged, salesOrder)
 		if err != nil {
 			logger.Error(err, "unable to create Odoo Record", "namespace", bd.Namespace)
 			continue
@@ -104,7 +105,7 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 	return allRecords, nil
 }
 
-func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetricsData, b BucketDetail, appuioManaged bool) ([]odoo.OdooMeteredBillingRecord, error) {
+func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetricsData, b BucketDetail, appuioManaged bool, salesOrder string) ([]odoo.OdooMeteredBillingRecord, error) {
 	if len(bucketMetricsData.TimeSeries) != 1 {
 		return nil, fmt.Errorf("there must be exactly one metrics data point, found %d", len(bucketMetricsData.TimeSeries))
 	}
@@ -137,7 +138,7 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 			InstanceID:           instanceId,
 			ItemDescription:      "AppCat Cloudscale ObjectStorage",
 			ItemGroupDescription: itemGroup,
-			SalesOrder:           o.salesOrder,
+			SalesOrder:           salesOrder,
 			UnitID:               o.uomMapping[units[productIdStorage]],
 			ConsumedUnits:        storageBytesValue,
 			TimeRange: odoo.TimeRange{
@@ -150,7 +151,7 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 			InstanceID:           instanceId,
 			ItemDescription:      "AppCat Cloudscale ObjectStorage",
 			ItemGroupDescription: itemGroup,
-			SalesOrder:           o.salesOrder,
+			SalesOrder:           salesOrder,
 			UnitID:               o.uomMapping[units[productIdTrafficOut]],
 			ConsumedUnits:        trafficOutValue,
 			TimeRange: odoo.TimeRange{
@@ -163,7 +164,7 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 			InstanceID:           instanceId,
 			ItemDescription:      "AppCat Cloudscale ObjectStorage",
 			ItemGroupDescription: itemGroup,
-			SalesOrder:           o.salesOrder,
+			SalesOrder:           salesOrder,
 			UnitID:               o.uomMapping[units[productIdQueryRequests]],
 			ConsumedUnits:        queryRequestsValue,
 			TimeRange: odoo.TimeRange{

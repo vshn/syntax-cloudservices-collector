@@ -112,9 +112,10 @@ func (o *ObjectStorage) getOdooMeteredBillingRecords(ctx context.Context, sosBuc
 
 			itemGroup := fmt.Sprintf("APPUiO Managed - Zone: %s / Namespace: %s", o.clusterId, bucketDetail.Namespace)
 			instanceId := fmt.Sprintf("%s/%s", bucketDetail.Zone, bucketDetail.BucketName)
-			if o.salesOrder == "" {
+			salesOrder := o.salesOrder
+			if salesOrder == "" {
 				itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", o.clusterId, bucketDetail.Namespace)
-				o.salesOrder, err = controlAPI.GetSalesOrder(ctx, o.controlApiClient, bucketDetail.Organization)
+				salesOrder, err = controlAPI.GetSalesOrder(ctx, o.controlApiClient, bucketDetail.Organization)
 				if err != nil {
 					logger.Error(err, "unable to sync bucket", "namespace", bucketDetail.Namespace)
 					continue
@@ -126,7 +127,7 @@ func (o *ObjectStorage) getOdooMeteredBillingRecords(ctx context.Context, sosBuc
 				InstanceID:           instanceId,
 				ItemDescription:      "AppCat Exoscale ObjectStorage",
 				ItemGroupDescription: itemGroup,
-				SalesOrder:           o.salesOrder,
+				SalesOrder:           salesOrder,
 				UnitID:               o.uomMapping[odoo.GBDay],
 				ConsumedUnits:        value,
 				TimeRange: odoo.TimeRange{
