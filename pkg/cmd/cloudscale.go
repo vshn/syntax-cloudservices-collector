@@ -34,6 +34,7 @@ func CloudscaleCmds() *cli.Command {
 		odooClientSecret  string
 		salesOrder        string
 		clusterId         string
+		cloudZone         string
 		uom               string
 	)
 	return &cli.Command{
@@ -62,6 +63,8 @@ func CloudscaleCmds() *cli.Command {
 				EnvVars: []string{"APPUIO_MANAGED_SALES_ORDER"}, Destination: &salesOrder, Required: false, DefaultText: defaultTextForOptionalFlags},
 			&cli.StringFlag{Name: "cluster-id", Usage: "The cluster id to save in the billing record",
 				EnvVars: []string{"CLUSTER_ID"}, Destination: &clusterId, Required: true, DefaultText: defaultTextForRequiredFlags},
+			&cli.StringFlag{Name: "cluster-zone", Usage: "The cluster zone to save in the billing record",
+				EnvVars: []string{"CLOUD_ZONE"}, Destination: &cloudZone, Required: false, DefaultText: defaultTextForOptionalFlags},
 			&cli.StringFlag{Name: "uom", Usage: "Unit of measure mapping between cloud services and Odoo16 in json format",
 				EnvVars: []string{"UOM"}, Destination: &uom, Required: true, DefaultText: defaultTextForRequiredFlags},
 			&cli.IntFlag{Name: "collect-interval", Usage: "How often to collect the metrics from the Cloud Service in hours - 1-23",
@@ -106,7 +109,7 @@ func CloudscaleCmds() *cli.Command {
 				return fmt.Errorf("load loaction: %w", err)
 			}
 
-			o, err := cs.NewObjectStorage(cloudscaleClient, k8sClient, k8sControlClient, salesOrder, clusterId, mapping)
+			o, err := cs.NewObjectStorage(cloudscaleClient, k8sClient, k8sControlClient, salesOrder, clusterId, cloudZone, mapping)
 			if err != nil {
 				return fmt.Errorf("object storage: %w", err)
 			}

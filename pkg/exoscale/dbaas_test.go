@@ -22,7 +22,7 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 		ProductID:            "appcat-exoscale-pg-hobbyist-2",
 		InstanceID:           "ch-gva-2/postgres-abc",
 		ItemDescription:      "Exoscale DBaaS PostgreSQL",
-		ItemGroupDescription: "APPUiO Managed - Zone: c-test1 / Namespace: vshn-xyz",
+		ItemGroupDescription: "APPUiO Managed - Cluster: c-test1 / Namespace: vshn-xyz",
 		SalesOrder:           "1234",
 		UnitID:               "",
 		ConsumedUnits:        1,
@@ -35,7 +35,7 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 		ProductID:            "appcat-exoscale-pg-business-128",
 		InstanceID:           "ch-gva-2/postgres-def",
 		ItemDescription:      "Exoscale DBaaS PostgreSQL",
-		ItemGroupDescription: "APPUiO Managed - Zone: c-test1 / Namespace: vshn-uvw",
+		ItemGroupDescription: "APPUiO Managed - Cluster: c-test1 / Namespace: vshn-uvw",
 		SalesOrder:           "1234",
 		UnitID:               "",
 		ConsumedUnits:        1,
@@ -117,7 +117,7 @@ func TestDBaaS_aggregatedDBaaS(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ds, _ := NewDBaaS(nil, nil, nil, 1, "1234", "c-test1", map[string]string{})
+			ds, _ := NewDBaaS(nil, nil, nil, 1, "1234", "c-test1", "", map[string]string{})
 			aggregatedOdooRecords, err := ds.AggregateDBaaS(ctx, tc.exoscaleDBaaS, tc.dbaasDetails)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expectedAggregatedOdooRecords, aggregatedOdooRecords)

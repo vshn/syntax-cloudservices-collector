@@ -28,6 +28,7 @@ type ObjectStorage struct {
 	controlApiClient k8s.Client
 	salesOrder       string
 	clusterId        string
+	cloudZone        string
 	uomMapping       map[string]string
 }
 
@@ -35,13 +36,14 @@ const (
 	namespaceLabel = "crossplane.io/claim-namespace"
 )
 
-func NewObjectStorage(client *cloudscale.Client, k8sClient k8s.Client, controlApiClient k8s.Client, salesOrder, clusterId string, uomMapping map[string]string) (*ObjectStorage, error) {
+func NewObjectStorage(client *cloudscale.Client, k8sClient k8s.Client, controlApiClient k8s.Client, salesOrder, clusterId string, cloudZone string, uomMapping map[string]string) (*ObjectStorage, error) {
 	return &ObjectStorage{
 		client:           client,
 		k8sClient:        k8sClient,
 		controlApiClient: controlApiClient,
 		salesOrder:       salesOrder,
 		clusterId:        clusterId,
+		cloudZone:        cloudZone,
 		uomMapping:       uomMapping,
 	}, nil
 }
@@ -125,9 +127,9 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 
 	itemGroup := ""
 	if appuioManaged {
-		itemGroup = fmt.Sprintf("APPUiO Managed - Zone: %s / Namespace: %s", o.clusterId, b.Namespace)
+		itemGroup = fmt.Sprintf("APPUiO Managed - Cluster: %s / Namespace: %s", o.clusterId, b.Namespace)
 	} else {
-		itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", o.clusterId, b.Namespace)
+		itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", o.cloudZone, b.Namespace)
 	}
 
 	instanceId := fmt.Sprintf("%s/%s", b.Zone, bucketMetricsData.Subject.BucketName)
