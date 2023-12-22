@@ -209,9 +209,10 @@ func (ds *DBaaS) AggregateDBaaS(ctx context.Context, exoscaleDBaaS []*egoscale.D
 
 			itemGroup := fmt.Sprintf("APPUiO Managed - Zone: %s / Namespace: %s", ds.clusterId, dbaasDetail.Namespace)
 			instanceId := fmt.Sprintf("%s/%s", dbaasDetail.Zone, dbaasDetail.DBName)
-			if ds.salesOrder == "" {
+			salesOrder := ds.salesOrder
+			if salesOrder == "" {
 				itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", ds.clusterId, dbaasDetail.Namespace)
-				ds.salesOrder, err = controlAPI.GetSalesOrder(ctx, ds.controlApiClient, dbaasDetail.Organization)
+				salesOrder, err = controlAPI.GetSalesOrder(ctx, ds.controlApiClient, dbaasDetail.Organization)
 				if err != nil {
 					logger.Error(err, "Unable to sync DBaaS, cannot get salesOrder", "namespace", dbaasDetail.Namespace)
 					continue
@@ -223,7 +224,7 @@ func (ds *DBaaS) AggregateDBaaS(ctx context.Context, exoscaleDBaaS []*egoscale.D
 				InstanceID:           instanceId,
 				ItemDescription:      "Exoscale DBaaS " + dbaasTypes[*dbaasUsage.Type],
 				ItemGroupDescription: itemGroup,
-				SalesOrder:           ds.salesOrder,
+				SalesOrder:           salesOrder,
 				UnitID:               ds.uomMapping[odoo.InstanceHour],
 				ConsumedUnits:        1,
 				TimeRange: odoo.TimeRange{
