@@ -32,6 +32,7 @@ func ExoscaleCmds() *cli.Command {
 		odooClientSecret  string
 		salesOrder        string
 		clusterId         string
+		cloudZone         string
 		uom               string
 		// For dbaas in minutes
 		// For objectstorage in hours
@@ -69,6 +70,8 @@ func ExoscaleCmds() *cli.Command {
 				EnvVars: []string{"BILLING_HOUR"}, Destination: &billingHour, Required: false, DefaultText: defaultTextForOptionalFlags},
 			&cli.StringFlag{Name: "cluster-id", Usage: "The cluster id to save in the billing record",
 				EnvVars: []string{"CLUSTER_ID"}, Destination: &clusterId, Required: true, DefaultText: defaultTextForRequiredFlags},
+			&cli.StringFlag{Name: "cluster-zone", Usage: "The cluster zone to save in the billing record",
+				EnvVars: []string{"CLOUD_ZONE"}, Destination: &cloudZone, Required: false, DefaultText: defaultTextForOptionalFlags},
 			&cli.StringFlag{Name: "uom", Usage: "Unit of measure mapping between cloud services and Odoo16 in json format",
 				EnvVars: []string{"UOM"}, Destination: &uom, Required: true, DefaultText: defaultTextForRequiredFlags},
 		},
@@ -116,7 +119,7 @@ func ExoscaleCmds() *cli.Command {
 						collectInterval = 23
 					}
 
-					o, err := exoscale.NewObjectStorage(exoscaleClient, k8sClient, k8sControlClient, salesOrder, clusterId, mapping)
+					o, err := exoscale.NewObjectStorage(exoscaleClient, k8sClient, k8sControlClient, salesOrder, clusterId, cloudZone, mapping)
 					if err != nil {
 						return fmt.Errorf("objectbucket service: %w", err)
 					}
@@ -196,7 +199,7 @@ func ExoscaleCmds() *cli.Command {
 						collectInterval = 1
 					}
 
-					d, err := exoscale.NewDBaaS(exoscaleClient, k8sClient, k8sControlClient, collectInterval, salesOrder, clusterId, mapping)
+					d, err := exoscale.NewDBaaS(exoscaleClient, k8sClient, k8sControlClient, collectInterval, salesOrder, clusterId, cloudZone, mapping)
 					if err != nil {
 						return fmt.Errorf("dbaas service: %w", err)
 					}

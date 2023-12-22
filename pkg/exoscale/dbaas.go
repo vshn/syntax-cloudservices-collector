@@ -68,18 +68,20 @@ type DBaaS struct {
 	controlApiClient k8s.Client
 	salesOrder       string
 	clusterId        string
+	cloudZone        string
 	collectInterval  int
 	uomMapping       map[string]string
 }
 
 // NewDBaaS creates a Service with the initial setup
-func NewDBaaS(exoscaleClient *egoscale.Client, k8sClient k8s.Client, controlApiClient k8s.Client, collectInterval int, salesOrder, clusterId string, uomMapping map[string]string) (*DBaaS, error) {
+func NewDBaaS(exoscaleClient *egoscale.Client, k8sClient k8s.Client, controlApiClient k8s.Client, collectInterval int, salesOrder, clusterId string, cloudZone string, uomMapping map[string]string) (*DBaaS, error) {
 	return &DBaaS{
 		exoscaleClient:   exoscaleClient,
 		k8sClient:        k8sClient,
 		controlApiClient: controlApiClient,
 		salesOrder:       salesOrder,
 		clusterId:        clusterId,
+		cloudZone:        cloudZone,
 		collectInterval:  collectInterval,
 		uomMapping:       uomMapping,
 	}, nil
@@ -207,11 +209,11 @@ func (ds *DBaaS) AggregateDBaaS(ctx context.Context, exoscaleDBaaS []*egoscale.D
 		if exists && dbaasDetail.Kind == groupVersionKinds[*dbaasUsage.Type].Kind {
 			logger.V(1).Info("Found exoscale dbaas usage", "instance", dbaasUsage.Name, "instance created", dbaasUsage.CreatedAt)
 
-			itemGroup := fmt.Sprintf("APPUiO Managed - Zone: %s / Namespace: %s", ds.clusterId, dbaasDetail.Namespace)
+			itemGroup := fmt.Sprintf("APPUiO Managed - Cluster: %s / Namespace: %s", ds.clusterId, dbaasDetail.Namespace)
 			instanceId := fmt.Sprintf("%s/%s", dbaasDetail.Zone, dbaasDetail.DBName)
 			salesOrder := ds.salesOrder
 			if salesOrder == "" {
-				itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", ds.clusterId, dbaasDetail.Namespace)
+				itemGroup = fmt.Sprintf("APPUiO Cloud - Zone: %s / Namespace: %s", ds.cloudZone, dbaasDetail.Namespace)
 				salesOrder, err = controlAPI.GetSalesOrder(ctx, ds.controlApiClient, dbaasDetail.Organization)
 				if err != nil {
 					logger.Error(err, "Unable to sync DBaaS, cannot get salesOrder", "namespace", dbaasDetail.Namespace)
