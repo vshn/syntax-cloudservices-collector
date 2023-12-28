@@ -137,7 +137,7 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 	return []odoo.OdooMeteredBillingRecord{
 		{
 			ProductID:            productIdStorage,
-			InstanceID:           instanceId,
+			InstanceID:           instanceId + "/storage",
 			ItemDescription:      bucketMetricsData.Subject.BucketName,
 			ItemGroupDescription: itemGroup,
 			SalesOrder:           salesOrder,
@@ -150,7 +150,7 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 		},
 		{
 			ProductID:            productIdTrafficOut,
-			InstanceID:           instanceId,
+			InstanceID:           instanceId + "/trafficout",
 			ItemDescription:      bucketMetricsData.Subject.BucketName,
 			ItemGroupDescription: itemGroup,
 			SalesOrder:           salesOrder,
@@ -163,7 +163,7 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 		},
 		{
 			ProductID:            productIdQueryRequests,
-			InstanceID:           instanceId,
+			InstanceID:           instanceId + "/requests",
 			ItemDescription:      bucketMetricsData.Subject.BucketName,
 			ItemGroupDescription: itemGroup,
 			SalesOrder:           salesOrder,
