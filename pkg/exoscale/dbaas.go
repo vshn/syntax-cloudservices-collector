@@ -222,7 +222,7 @@ func (ds *DBaaS) AggregateDBaaS(ctx context.Context, exoscaleDBaaS []*egoscale.D
 			}
 
 			o := odoo.OdooMeteredBillingRecord{
-				ProductID:            productIdPrefix + fmt.Sprintf("-%s-%s", *dbaasUsage.Type, *dbaasUsage.Plan),
+				ProductID:            productIdPrefix + fmt.Sprintf("-v2-%s-%s", *dbaasUsage.Type, *dbaasUsage.Plan),
 				InstanceID:           instanceId,
 				ItemDescription:      dbaasDetail.DBName,
 				ItemGroupDescription: itemGroup,
