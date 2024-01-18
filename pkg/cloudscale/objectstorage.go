@@ -120,7 +120,7 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 	if err != nil {
 		return nil, err
 	}
-	queryRequestsValue, err := convertUnit(units[productIdQueryRequests], uint64(bucketMetricsData.TimeSeries[0].Usage.SentBytes))
+	queryRequestsValue, err := convertUnit(units[productIdQueryRequests], uint64(bucketMetricsData.TimeSeries[0].Usage.Requests))
 	if err != nil {
 		return nil, err
 	}
