@@ -95,7 +95,7 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 				continue
 			}
 		}
-		records, err := o.createOdooRecord(bucketMetricsData, bd, appuioManaged, salesOrder)
+		records, err := o.createOdooRecord(bucketMetricsData, bd, appuioManaged, salesOrder, billingDate)
 		if err != nil {
 			logger.Error(err, "unable to create Odoo Record", "namespace", bd.Namespace)
 			continue
@@ -107,7 +107,7 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 	return allRecords, nil
 }
 
-func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetricsData, b BucketDetail, appuioManaged bool, salesOrder string) ([]odoo.OdooMeteredBillingRecord, error) {
+func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetricsData, b BucketDetail, appuioManaged bool, salesOrder string, billingDate time.Time) ([]odoo.OdooMeteredBillingRecord, error) {
 	if len(bucketMetricsData.TimeSeries) != 1 {
 		return nil, fmt.Errorf("there must be exactly one metrics data point, found %d", len(bucketMetricsData.TimeSeries))
 	}
@@ -134,6 +134,9 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 
 	instanceId := fmt.Sprintf("%s/%s", b.Zone, bucketMetricsData.Subject.BucketName)
 
+	billingStart := time.Date(billingDate.Year(), billingDate.Month(), billingDate.Day(), 0, 0, 0, 0, time.UTC)
+	billingEnd := time.Date(billingDate.Year(), billingDate.Month(), billingDate.Day()+1, 0, 0, 0, 0, time.UTC)
+
 	return []odoo.OdooMeteredBillingRecord{
 		{
 			ProductID:            productIdStorage,
@@ -144,8 +147,8 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 			UnitID:               o.uomMapping[units[productIdStorage]],
 			ConsumedUnits:        storageBytesValue,
 			TimeRange: odoo.TimeRange{
-				From: bucketMetricsData.TimeSeries[0].Start,
-				To:   bucketMetricsData.TimeSeries[0].End,
+				From: billingStart,
+				To:   billingEnd,
 			},
 		},
 		{
@@ -157,8 +160,8 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 			UnitID:               o.uomMapping[units[productIdTrafficOut]],
 			ConsumedUnits:        trafficOutValue,
 			TimeRange: odoo.TimeRange{
-				From: bucketMetricsData.TimeSeries[0].Start,
-				To:   bucketMetricsData.TimeSeries[0].End,
+				From: billingStart,
+				To:   billingEnd,
 			},
 		},
 		{
@@ -170,8 +173,8 @@ func (o *ObjectStorage) createOdooRecord(bucketMetricsData cloudscale.BucketMetr
 			UnitID:               o.uomMapping[units[productIdQueryRequests]],
 			ConsumedUnits:        queryRequestsValue,
 			TimeRange: odoo.TimeRange{
-				From: bucketMetricsData.TimeSeries[0].Start,
-				To:   bucketMetricsData.TimeSeries[0].End,
+				From: billingStart,
+				To:   billingEnd,
 			},
 		},
 	}, nil
