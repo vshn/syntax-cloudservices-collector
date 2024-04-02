@@ -19,7 +19,7 @@ IMG_TAG ?= latest
 # Image URL to use all building/pushing image targets
 CONTAINER_IMG ?= ghcr.io/$(PROJECT_OWNER)/$(PROJECT_NAME):$(IMG_TAG)
 
-ANTORA_PREVIEW_CMD ?= $(DOCKER_CMD) run --rm --publish 35729:35729 --publish 2020:2020 --volume "${PWD}/.git":/preview/antora/.git --volume "${PWD}/docs":/preview/antora/docs docker.io/vshn/antora-preview:3.0.1.1 --style=syn --antora=docs
+ANTORA_PREVIEW_CMD ?= $(DOCKER_CMD) run --rm --publish 35729:35729 --publish 2020:2020 --volume "${PWD}/.git":/preview/antora/.git --volume "${PWD}/docs":/preview/antora/docs ghcr.io/vshn/antora-preview --style=syn --antora=docs
 
 # TEST:integration
 ENVTEST_ADDITIONAL_FLAGS ?= --bin-dir "$(go_bin)"
