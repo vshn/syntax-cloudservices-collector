@@ -55,9 +55,6 @@ func SpksCMD() *cli.Command {
 				EnvVars: []string{"UNIT_ID"}, Destination: &UnitID, Required: true, DefaultText: defaultTextForRequiredFlags, Value: "uom_uom_68_b1811ca1"},
 		},
 		Action: func(c *cli.Context) error {
-			// this function is intended to run once a day
-			// it will query the prometheus metrics for the last 24 hours
-			// it will be run via kubernetes cronjob at midnight
 			logger := log.Logger(c.Context)
 			logger.Info("starting spks data collector")
 
@@ -103,8 +100,8 @@ func SpksCMD() *cli.Command {
 				return fmt.Errorf("load loaction: %w", err)
 			}
 
-			from := time.Now().In(location).UTC()
-			to := time.Now().In(location).Add(-(time.Hour * 24)).UTC()
+			from := time.Now().In(location).Add(-(time.Hour * 24)).UTC()
+			to := time.Now().In(location).UTC()
 
 			billingRecords := []odoo.OdooMeteredBillingRecord{
 				{
@@ -165,13 +162,22 @@ func SpksCMD() *cli.Command {
 			sigint := make(chan os.Signal, 1)
 			signal.Notify(sigint, os.Interrupt)
 
+			// ensure first data export after restart
+			// I want to avoid situation when data is not exported because of constant restarts
+			err = odooClient.SendData(billingRecords)
+			if err != nil {
+				logger.Error(err, "can't export data to Odoo")
+				return err
+			}
+
 			for loop := true; loop; {
 				select {
 				case <-ticker.C:
+					// this runs every 24 hours after program start
 					err = odooClient.SendData(billingRecords)
 					if err != nil {
 						logger.Error(err, "can't export data to Odoo")
-						panic(err)
+						return err
 					}
 				case <-sigint:
 					loop = false
