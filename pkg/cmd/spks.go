@@ -47,7 +47,7 @@ func SpksCMD() *cli.Command {
 				EnvVars: []string{"ODOO_OAUTH_CLIENT_ID"}, Destination: &odooClientId, Required: true, DefaultText: defaultTextForRequiredFlags},
 			&cli.StringFlag{Name: "odoo-oauth-client-secret", Usage: "Client secret of the oauth client to interact with Odoo metered billing API",
 				EnvVars: []string{"ODOO_OAUTH_CLIENT_SECRET"}, Destination: &odooClientSecret, Required: true, DefaultText: defaultTextForRequiredFlags},
-			&cli.StringFlag{Name: "sales-order", Usage: "Sales order for APPUiO Managed clusters",
+			&cli.StringFlag{Name: "sales-order", Usage: "Sales order to report billing data to",
 				EnvVars: []string{"SALES_ORDER"}, Destination: &salesOrder, Required: false, DefaultText: defaultTextForOptionalFlags, Value: "S10121"},
 			&cli.StringFlag{Name: "prometheus-url", Usage: "URL of the Prometheus API",
 				EnvVars: []string{"PROMETHEUS_URL"}, Destination: &prometheusURL, Required: true, DefaultText: defaultTextForRequiredFlags, Value: "http://prometheus-monitoring-application.monitoring-application.svc.cluster.local:9090"},
