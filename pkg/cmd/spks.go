@@ -47,12 +47,12 @@ func SpksCMD() *cli.Command {
 				EnvVars: []string{"ODOO_OAUTH_CLIENT_ID"}, Destination: &odooClientId, Required: true, DefaultText: defaultTextForRequiredFlags},
 			&cli.StringFlag{Name: "odoo-oauth-client-secret", Usage: "Client secret of the oauth client to interact with Odoo metered billing API",
 				EnvVars: []string{"ODOO_OAUTH_CLIENT_SECRET"}, Destination: &odooClientSecret, Required: true, DefaultText: defaultTextForRequiredFlags},
-			&cli.StringFlag{Name: "sales-order", Usage: "Sales order for APPUiO Managed clusters",
-				EnvVars: []string{"SALES_ORDER"}, Destination: &salesOrder, DefaultText: defaultTextForOptionalFlags, Value: "S10121"},
+			&cli.StringFlag{Name: "sales-order", Usage: "Sales order to report billing data to",
+				EnvVars: []string{"SALES_ORDER"}, Destination: &salesOrder, Required: false, DefaultText: defaultTextForOptionalFlags, Value: "S10121"},
 			&cli.StringFlag{Name: "prometheus-url", Usage: "URL of the Prometheus API",
 				EnvVars: []string{"PROMETHEUS_URL"}, Destination: &prometheusURL, Required: true, DefaultText: defaultTextForRequiredFlags, Value: "http://prometheus-monitoring-application.monitoring-application.svc.cluster.local:9090"},
-			&cli.StringFlag{Name: "unit-id", Usage: "Unit ID for the consumed units",
-				EnvVars: []string{"UNIT_ID"}, Destination: &UnitID, DefaultText: defaultTextForRequiredFlags, Value: "uom_uom_68_b1811ca1"},
+			&cli.StringFlag{Name: "unit-id", Usage: "Metered Billing UoM ID for the consumed units",
+				EnvVars: []string{"UNIT_ID"}, Destination: &UnitID, Required: true, DefaultText: defaultTextForRequiredFlags, Value: "uom_uom_68_b1811ca1"},
 		},
 		Action: func(c *cli.Context) error {
 			logger := log.Logger(c.Context)
@@ -97,7 +97,7 @@ func SpksCMD() *cli.Command {
 			odooClient := odoo.NewOdooAPIClient(c.Context, odooURL, odooOauthTokenURL, odooClientId, odooClientSecret, logger)
 			location, err := time.LoadLocation("Europe/Zurich")
 			if err != nil {
-				return fmt.Errorf("load loaction: %w", err)
+				return fmt.Errorf("load location: %w", err)
 			}
 
 			from := time.Now().In(location).Add(-(time.Hour * 24)).UTC()
