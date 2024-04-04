@@ -51,7 +51,7 @@ func SpksCMD() *cli.Command {
 				EnvVars: []string{"SALES_ORDER"}, Destination: &salesOrder, Required: false, DefaultText: defaultTextForOptionalFlags, Value: "S10121"},
 			&cli.StringFlag{Name: "prometheus-url", Usage: "URL of the Prometheus API",
 				EnvVars: []string{"PROMETHEUS_URL"}, Destination: &prometheusURL, Required: true, DefaultText: defaultTextForRequiredFlags, Value: "http://prometheus-monitoring-application.monitoring-application.svc.cluster.local:9090"},
-			&cli.StringFlag{Name: "unit-id", Usage: "Unit ID for the consumed units",
+			&cli.StringFlag{Name: "unit-id", Usage: "Metered Billing UoM ID for the consumed units",
 				EnvVars: []string{"UNIT_ID"}, Destination: &UnitID, Required: true, DefaultText: defaultTextForRequiredFlags, Value: "uom_uom_68_b1811ca1"},
 		},
 		Action: func(c *cli.Context) error {
