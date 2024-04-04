@@ -97,7 +97,7 @@ func SpksCMD() *cli.Command {
 			odooClient := odoo.NewOdooAPIClient(c.Context, odooURL, odooOauthTokenURL, odooClientId, odooClientSecret, logger)
 			location, err := time.LoadLocation("Europe/Zurich")
 			if err != nil {
-				return fmt.Errorf("load loaction: %w", err)
+				return fmt.Errorf("load location: %w", err)
 			}
 
 			from := time.Now().In(location).Add(-(time.Hour * 24)).UTC()
