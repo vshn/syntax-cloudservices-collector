@@ -64,7 +64,7 @@ func SpksCMD() *cli.Command {
 			}
 			// this variable is necessary to query Prometheus, with timerange [1d:1d] it returns data from 1 day up to midnight
 			startOfToday := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, location)
-			startYesterdayAbsolute := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, location).Add(-(time.Hour * 24)).UTC()
+			startYesterdayAbsolute := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()-1, 0, 0, 0, 0, location).In(time.UTC)
 			endYesterdayAbsolute := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 23, 59, 59, 0, location).Add(-(time.Hour * 24)).UTC()
 
 			logger.Info("Getting specific metric from thanos")
