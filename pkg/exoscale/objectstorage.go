@@ -17,7 +17,9 @@ import (
 	k8s "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const productIdStorage = "appcat-exoscale-objectstorage-storage"
+const productIdStorageTier1 = "appcat-exoscale-objectstorage-storage-tier-1"
+const productIdStorageTier2 = "appcat-exoscale-objectstorage-storage-tier-2"
+const productIdStorageTier3 = "appcat-exoscale-objectstorage-storage-tier-3"
 
 // ObjectStorage gathers bucket data from exoscale provider and cluster and saves to the database
 type ObjectStorage struct {
@@ -125,7 +127,7 @@ func (o *ObjectStorage) getOdooMeteredBillingRecords(ctx context.Context, sosBuc
 			}
 
 			o := odoo.OdooMeteredBillingRecord{
-				ProductID:            productIdStorage,
+				ProductID:            getProductId(value),
 				InstanceID:           instanceId + "/storage",
 				ItemDescription:      bucketDetail.BucketName,
 				ItemGroupDescription: itemGroup,
@@ -145,6 +147,20 @@ func (o *ObjectStorage) getOdooMeteredBillingRecords(ctx context.Context, sosBuc
 		}
 	}
 	return aggregatedBuckets, nil
+}
+
+// getProductId calculates the tier based on the bucket storage consumption
+// For more details https://www.exoscale.com/object-storage/
+// Value is passed as GiB
+func getProductId(value float64) string {
+	valueTB := value / 1024
+	if valueTB < 512 {
+		return productIdStorageTier1
+	} else if valueTB > 1024 {
+		return productIdStorageTier3
+	} else {
+		return productIdStorageTier2
+	}
 }
 
 func (o *ObjectStorage) fetchManagedBucketsAndNamespaces(ctx context.Context) ([]BucketDetail, error) {
