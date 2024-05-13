@@ -50,13 +50,22 @@ func SpksCMD() *cli.Command {
 			&cli.StringFlag{Name: "sales-order", Usage: "Sales order to report billing data to",
 				EnvVars: []string{"SALES_ORDER"}, Destination: &salesOrder, Required: false, DefaultText: defaultTextForOptionalFlags, Value: "S10121"},
 			&cli.StringFlag{Name: "prometheus-url", Usage: "URL of the Prometheus API",
-				EnvVars: []string{"PROMETHEUS_URL"}, Destination: &prometheusURL, Required: true, DefaultText: defaultTextForRequiredFlags, Value: "http://prometheus-monitoring-application.monitoring-application.svc.cluster.local:9090"},
+				EnvVars: []string{"PROMETHEUS_URL"}, Destination: &prometheusURL, Required: false, DefaultText: defaultTextForRequiredFlags, Value: "http://prometheus-monitoring-application.monitoring-application.svc.cluster.local:9090"},
 			&cli.StringFlag{Name: "unit-id", Usage: "Metered Billing UoM ID for the consumed units",
-				EnvVars: []string{"UNIT_ID"}, Destination: &UnitID, Required: true, DefaultText: defaultTextForRequiredFlags, Value: "uom_uom_68_b1811ca1"},
+				EnvVars: []string{"UNIT_ID"}, Destination: &UnitID, Required: false, DefaultText: defaultTextForRequiredFlags, Value: "uom_uom_68_b1811ca1"},
 		},
 		Action: func(c *cli.Context) error {
 			logger := log.Logger(c.Context)
 			logger.Info("starting spks data collector")
+
+			location, err := time.LoadLocation("Europe/Zurich")
+			if err != nil {
+				return fmt.Errorf("load location: %w", err)
+			}
+			// this variable is necessary to query Prometheus, with timerange [1d:1d] it returns data from 1 day up to midnight
+			startOfToday := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, location)
+			startYesterdayAbsolute := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()-1, 0, 0, 0, 0, location).In(time.UTC)
+			endYesterdayAbsolute := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day()-1, 23, 59, 59, 0, location).In(time.UTC)
 
 			logger.Info("Getting specific metric from thanos")
 
@@ -73,35 +82,28 @@ func SpksCMD() *cli.Command {
 			defer cancel()
 			// send this value to odoo
 
-			mariadbStandard, err := QueryPrometheus(ctx, v1api, prometheusQueryArr[0], logger)
+			mariadbStandard, err := QueryPrometheus(ctx, v1api, prometheusQueryArr[0], logger, startOfToday)
 			if err != nil {
 				logger.Error(err, "Error querying Prometheus")
 				return err
 			}
-			mariadbPremium, err := QueryPrometheus(ctx, v1api, prometheusQueryArr[1], logger)
+			mariadbPremium, err := QueryPrometheus(ctx, v1api, prometheusQueryArr[1], logger, startOfToday)
 			if err != nil {
 				logger.Error(err, "Error querying Prometheus")
 				return err
 			}
-			redisStandard, err := QueryPrometheus(ctx, v1api, prometheusQueryArr[2], logger)
+			redisStandard, err := QueryPrometheus(ctx, v1api, prometheusQueryArr[2], logger, startOfToday)
 			if err != nil {
 				logger.Error(err, "Error querying Prometheus")
 				return err
 			}
-			redisPremium, err := QueryPrometheus(ctx, v1api, prometheusQueryArr[3], logger)
+			redisPremium, err := QueryPrometheus(ctx, v1api, prometheusQueryArr[3], logger, startOfToday)
 			if err != nil {
 				logger.Error(err, "Error querying Prometheus")
 				return err
 			}
 
 			odooClient := odoo.NewOdooAPIClient(c.Context, odooURL, odooOauthTokenURL, odooClientId, odooClientSecret, logger)
-			location, err := time.LoadLocation("Europe/Zurich")
-			if err != nil {
-				return fmt.Errorf("load location: %w", err)
-			}
-
-			from := time.Now().In(location).Add(-(time.Hour * 24)).UTC()
-			to := time.Now().In(location).UTC()
 
 			billingRecords := []odoo.OdooMeteredBillingRecord{
 				{
@@ -111,8 +113,8 @@ func SpksCMD() *cli.Command {
 					UnitID:        UnitID,
 					ConsumedUnits: float64(mariadbStandard),
 					TimeRange: odoo.TimeRange{
-						From: from,
-						To:   to,
+						From: startYesterdayAbsolute,
+						To:   endYesterdayAbsolute,
 					},
 				},
 				{
@@ -122,8 +124,8 @@ func SpksCMD() *cli.Command {
 					UnitID:        UnitID,
 					ConsumedUnits: float64(mariadbPremium),
 					TimeRange: odoo.TimeRange{
-						From: from,
-						To:   to,
+						From: startYesterdayAbsolute,
+						To:   endYesterdayAbsolute,
 					},
 				},
 				{
@@ -133,8 +135,8 @@ func SpksCMD() *cli.Command {
 					UnitID:        UnitID,
 					ConsumedUnits: float64(redisStandard),
 					TimeRange: odoo.TimeRange{
-						From: from,
-						To:   to,
+						From: startYesterdayAbsolute,
+						To:   endYesterdayAbsolute,
 					},
 				},
 				{
@@ -144,8 +146,8 @@ func SpksCMD() *cli.Command {
 					UnitID:        UnitID,
 					ConsumedUnits: float64(redisPremium),
 					TimeRange: odoo.TimeRange{
-						From: from,
-						To:   to,
+						From: startYesterdayAbsolute,
+						To:   endYesterdayAbsolute,
 					},
 				},
 			}
@@ -183,8 +185,8 @@ func SpksCMD() *cli.Command {
 	}
 }
 
-func QueryPrometheus(ctx context.Context, v1api v1.API, query string, logger logr.Logger) (int, error) {
-	result, warnings, err := v1api.Query(ctx, query, time.Now(), v1.WithTimeout(5*time.Second))
+func QueryPrometheus(ctx context.Context, v1api v1.API, query string, logger logr.Logger, absoluteBeginningTime time.Time) (int, error) {
+	result, warnings, err := v1api.Query(ctx, query, absoluteBeginningTime, v1.WithTimeout(5*time.Second))
 	if err != nil {
 		logger.Error(err, "Error querying Prometheus")
 		return 0, err
