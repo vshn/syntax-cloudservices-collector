@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/vshn/billing-collector-cloudservices/pkg/odoo"
 
 	"github.com/cloudscale-ch/cloudscale-go-sdk/v2"
@@ -19,7 +20,7 @@ import (
 const defaultTextForRequiredFlags = "<required>"
 const defaultTextForOptionalFlags = "<optional>"
 
-func CloudscaleCmds() *cli.Command {
+func CloudscaleCmds(allMetrics map[string]map[string]prometheus.Counter) *cli.Command {
 	var (
 		apiToken          string
 		kubeconfig        string
@@ -102,14 +103,14 @@ func CloudscaleCmds() *cli.Command {
 				return fmt.Errorf("k8s control client: %w", err)
 			}
 
-			odooClient := odoo.NewOdooAPIClient(c.Context, odooURL, odooOauthTokenURL, odooClientId, odooClientSecret, logger)
+			odooClient := odoo.NewOdooAPIClient(c.Context, odooURL, odooOauthTokenURL, odooClientId, odooClientSecret, logger, allMetrics["odooMetrics"])
 
 			location, err := time.LoadLocation("Europe/Zurich")
 			if err != nil {
 				return fmt.Errorf("load loaction: %w", err)
 			}
 
-			o, err := cs.NewObjectStorage(cloudscaleClient, k8sClient, k8sControlClient, salesOrder, clusterId, cloudZone, mapping)
+			o, err := cs.NewObjectStorage(cloudscaleClient, k8sClient, k8sControlClient, salesOrder, clusterId, cloudZone, mapping, allMetrics["providerMetrics"])
 			if err != nil {
 				return fmt.Errorf("object storage: %w", err)
 			}

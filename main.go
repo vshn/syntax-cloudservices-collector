@@ -3,12 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/urfave/cli/v2"
 	"github.com/vshn/billing-collector-cloudservices/pkg/cmd"
 	"github.com/vshn/billing-collector-cloudservices/pkg/log"
@@ -22,6 +26,40 @@ var (
 
 	appName     = "billing-collector-cloudservices"
 	appLongName = "Metrics collector which gathers metrics information for cloud services"
+
+	odooFailed = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "billing_cloud_collector_http_requests_odoo_failed_total",
+		Help: "Total number of failed HTTP requests to Odoo",
+	})
+	odooSucceeded = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "billing_cloud_collector_http_requests_odoo_succeeded_total",
+		Help: "Total number of successful HTTP requests to Odoo",
+	})
+
+	providerFailed = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "billing_cloud_collector_http_requests_provider_failed_total",
+		Help: "Total number of failed HTTP requests to the cloud provider",
+	})
+
+	providerSucceeded = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "billing_cloud_collector_http_requests_provider_succeeded_total",
+		Help: "Total number of successful HTTP requests to the cloud provider",
+	})
+
+	providerMetrics = map[string]prometheus.Counter{
+		"providerFailed":    providerFailed,
+		"providerSucceeded": providerSucceeded,
+	}
+
+	odooMetrics = map[string]prometheus.Counter{
+		"odooFailed":    odooFailed,
+		"odooSucceeded": odooSucceeded,
+	}
+
+	allMetrics = map[string]map[string]prometheus.Counter{
+		"odooMetrics":     odooMetrics,
+		"providerMetrics": providerMetrics,
+	}
 )
 
 func init() {
@@ -32,12 +70,23 @@ func init() {
 func main() {
 	ctx, stop, app := newApp()
 	defer stop()
+
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		err := http.ListenAndServe(":2112", nil)
+		if err != nil {
+			fmt.Println("Error starting prometheus server: ", err.Error())
+		}
+		os.Exit(1)
+	}()
+
 	err := app.RunContext(ctx, os.Args)
 	// If required flags aren't set, it will return with error before we could set up logging
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
+
 }
 
 func newApp() (context.Context, context.CancelFunc, *cli.App) {
@@ -45,6 +94,9 @@ func newApp() (context.Context, context.CancelFunc, *cli.App) {
 		logLevel  int
 		logFormat string
 	)
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+
 	app := &cli.App{
 		Name:    appName,
 		Usage:   appLongName,
@@ -120,9 +172,9 @@ func newApp() (context.Context, context.CancelFunc, *cli.App) {
 			return nil
 		},
 		Commands: []*cli.Command{
-			cmd.ExoscaleCmds(),
-			cmd.CloudscaleCmds(),
-			cmd.SpksCMD(),
+			cmd.ExoscaleCmds(allMetrics),
+			cmd.CloudscaleCmds(allMetrics),
+			cmd.SpksCMD(allMetrics, ctx),
 		},
 		ExitErrHandler: func(c *cli.Context, err error) {
 			if err != nil {
@@ -132,6 +184,5 @@ func newApp() (context.Context, context.CancelFunc, *cli.App) {
 		},
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	return ctx, stop, app
 }
