@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/oauth2/clientcredentials"
 )
 
@@ -25,6 +26,7 @@ type OdooAPIClient struct {
 	odooURL     string
 	logger      logr.Logger
 	oauthClient *http.Client
+	odooMetrics map[string]prometheus.Counter
 }
 
 type apiObject struct {
@@ -55,7 +57,7 @@ func (t *TimeRange) UnmarshalJSON([]byte) error {
 	return errors.New("Not implemented")
 }
 
-func NewOdooAPIClient(ctx context.Context, odooURL string, oauthTokenURL string, oauthClientId string, oauthClientSecret string, logger logr.Logger) *OdooAPIClient {
+func NewOdooAPIClient(ctx context.Context, odooURL string, oauthTokenURL string, oauthClientId string, oauthClientSecret string, logger logr.Logger, odooMetrics map[string]prometheus.Counter) *OdooAPIClient {
 	oauthConfig := clientcredentials.Config{
 		ClientID:     oauthClientId,
 		ClientSecret: oauthClientSecret,
@@ -66,6 +68,7 @@ func NewOdooAPIClient(ctx context.Context, odooURL string, oauthTokenURL string,
 		odooURL:     odooURL,
 		logger:      logger,
 		oauthClient: oauthClient,
+		odooMetrics: odooMetrics,
 	}
 }
 
@@ -79,14 +82,20 @@ func (c OdooAPIClient) SendData(data []OdooMeteredBillingRecord) error {
 	}
 	resp, err := c.oauthClient.Post(c.odooURL, "application/json", bytes.NewBuffer(str))
 	if err != nil {
+		c.odooMetrics["odooFailed"].Inc()
 		return err
 	}
+
 	defer resp.Body.Close()
+
 	body, _ := io.ReadAll(resp.Body)
 	c.logger.Info("Records sent to Odoo API", "status", resp.Status, "body", string(body), "numberOfRecords", len(data))
 
 	if resp.StatusCode != 200 {
+		c.odooMetrics["odooFailed"].Inc()
 		return errors.New(fmt.Sprintf("API error when sending records to Odoo:\n%s", body))
+	} else {
+		c.odooMetrics["odooSucceeded"].Inc()
 	}
 
 	return nil

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/vshn/billing-collector-cloudservices/pkg/controlAPI"
 	"github.com/vshn/billing-collector-cloudservices/pkg/kubernetes"
 	"github.com/vshn/billing-collector-cloudservices/pkg/log"
@@ -30,13 +31,14 @@ type ObjectStorage struct {
 	clusterId        string
 	cloudZone        string
 	uomMapping       map[string]string
+	providerMetrics  map[string]prometheus.Counter
 }
 
 const (
 	namespaceLabel = "crossplane.io/claim-namespace"
 )
 
-func NewObjectStorage(client *cloudscale.Client, k8sClient k8s.Client, controlApiClient k8s.Client, salesOrder, clusterId string, cloudZone string, uomMapping map[string]string) (*ObjectStorage, error) {
+func NewObjectStorage(client *cloudscale.Client, k8sClient k8s.Client, controlApiClient k8s.Client, salesOrder, clusterId string, cloudZone string, uomMapping map[string]string, providerMetrics map[string]prometheus.Counter) (*ObjectStorage, error) {
 	return &ObjectStorage{
 		client:           client,
 		k8sClient:        k8sClient,
@@ -45,6 +47,7 @@ func NewObjectStorage(client *cloudscale.Client, k8sClient k8s.Client, controlAp
 		clusterId:        clusterId,
 		cloudZone:        cloudZone,
 		uomMapping:       uomMapping,
+		providerMetrics:  providerMetrics,
 	}, nil
 }
 
@@ -56,7 +59,10 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 	bucketMetricsRequest := cloudscale.BucketMetricsRequest{Start: billingDate, End: billingDate}
 	bucketMetrics, err := o.client.Metrics.GetBucketMetrics(ctx, &bucketMetricsRequest)
 	if err != nil {
+		o.providerMetrics["providerFailed"].Inc()
 		return nil, err
+	} else {
+		o.providerMetrics["providerSucceeded"].Inc()
 	}
 
 	// Fetch organisations in case salesOrder is missing

@@ -7,6 +7,7 @@ import (
 
 	egoscale "github.com/exoscale/egoscale/v2"
 	"github.com/exoscale/egoscale/v2/oapi"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/vshn/billing-collector-cloudservices/pkg/controlAPI"
 	"github.com/vshn/billing-collector-cloudservices/pkg/exofixtures"
 	"github.com/vshn/billing-collector-cloudservices/pkg/kubernetes"
@@ -30,6 +31,7 @@ type ObjectStorage struct {
 	clusterId        string
 	cloudZone        string
 	uomMapping       map[string]string
+	providerMetrics  map[string]prometheus.Counter
 }
 
 // BucketDetail a k8s bucket object with relevant data
@@ -38,7 +40,7 @@ type BucketDetail struct {
 }
 
 // NewObjectStorage creates an ObjectStorage with the initial setup
-func NewObjectStorage(exoscaleClient *egoscale.Client, k8sClient k8s.Client, controlApiClient k8s.Client, salesOrder, clusterId string, cloudZone string, uomMapping map[string]string) (*ObjectStorage, error) {
+func NewObjectStorage(exoscaleClient *egoscale.Client, k8sClient k8s.Client, controlApiClient k8s.Client, salesOrder, clusterId string, cloudZone string, uomMapping map[string]string, providerMetrics map[string]prometheus.Counter) (*ObjectStorage, error) {
 	return &ObjectStorage{
 		k8sClient:        k8sClient,
 		exoscaleClient:   exoscaleClient,
@@ -47,13 +49,17 @@ func NewObjectStorage(exoscaleClient *egoscale.Client, k8sClient k8s.Client, con
 		clusterId:        clusterId,
 		cloudZone:        cloudZone,
 		uomMapping:       uomMapping,
+		providerMetrics:  providerMetrics,
 	}, nil
 }
 
 func (o *ObjectStorage) GetMetrics(ctx context.Context) ([]odoo.OdooMeteredBillingRecord, error) {
 	detail, err := o.fetchManagedBucketsAndNamespaces(ctx)
 	if err != nil {
+		o.providerMetrics["providerFailed"].Inc()
 		return nil, fmt.Errorf("fetchManagedBucketsAndNamespaces: %w", err)
+	} else {
+		o.providerMetrics["providerSucceeded"].Inc()
 	}
 
 	metrics, err := o.getBucketUsage(ctx, detail)
@@ -71,7 +77,10 @@ func (o *ObjectStorage) getBucketUsage(ctx context.Context, bucketDetails []Buck
 
 	resp, err := o.exoscaleClient.ListSosBucketsUsageWithResponse(ctx)
 	if err != nil {
+		o.providerMetrics["providerFailed"].Inc()
 		return nil, err
+	} else {
+		o.providerMetrics["providerSucceeded"].Inc()
 	}
 
 	odooMetrics, err := o.getOdooMeteredBillingRecords(ctx, *resp.JSON200.SosBucketsUsage, bucketDetails)

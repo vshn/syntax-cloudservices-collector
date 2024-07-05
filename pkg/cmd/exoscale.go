@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/vshn/billing-collector-cloudservices/pkg/odoo"
 
 	"github.com/urfave/cli/v2"
@@ -19,7 +20,7 @@ func addCommandName(c *cli.Context) error {
 	return nil
 }
 
-func ExoscaleCmds() *cli.Command {
+func ExoscaleCmds(allMetrics map[string]map[string]prometheus.Counter) *cli.Command {
 	var (
 		secret            string
 		accessKey         string
@@ -112,14 +113,14 @@ func ExoscaleCmds() *cli.Command {
 						return fmt.Errorf("k8s control client: %w", err)
 					}
 
-					odooClient := odoo.NewOdooAPIClient(c.Context, odooURL, odooOauthTokenURL, odooClientId, odooClientSecret, logger)
+					odooClient := odoo.NewOdooAPIClient(c.Context, odooURL, odooOauthTokenURL, odooClientId, odooClientSecret, logger, allMetrics["odooMetrics"])
 
 					if collectInterval < 1 || collectInterval > 23 {
 						// Set to run once a day after billingHour in case the collectInterval is out of boundaries
 						collectInterval = 23
 					}
 
-					o, err := exoscale.NewObjectStorage(exoscaleClient, k8sClient, k8sControlClient, salesOrder, clusterId, cloudZone, mapping)
+					o, err := exoscale.NewObjectStorage(exoscaleClient, k8sClient, k8sControlClient, salesOrder, clusterId, cloudZone, mapping, allMetrics["providerMetrics"])
 					if err != nil {
 						return fmt.Errorf("objectbucket service: %w", err)
 					}
@@ -192,7 +193,7 @@ func ExoscaleCmds() *cli.Command {
 						return fmt.Errorf("k8s control client: %w", err)
 					}
 
-					odooClient := odoo.NewOdooAPIClient(c.Context, odooURL, odooOauthTokenURL, odooClientId, odooClientSecret, logger)
+					odooClient := odoo.NewOdooAPIClient(c.Context, odooURL, odooOauthTokenURL, odooClientId, odooClientSecret, logger, allMetrics["odooMetrics"])
 
 					if collectInterval < 1 || collectInterval > 24 {
 						// Set to run once a day after billingHour in case the collectInterval is out of boundaries
