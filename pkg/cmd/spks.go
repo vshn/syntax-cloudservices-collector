@@ -64,7 +64,12 @@ func SpksCMD(allMetrics map[string]map[string]prometheus.Counter, ctx context.Co
 
 			ticker := time.NewTicker(24 * time.Hour)
 
-			runSPKSBilling(prometheusURL, prometheusQueryArr, logger, allMetrics, salesOrder, UnitID, c.Context)
+			daysChannel := make(chan int, 1)
+			if days != 0 {
+				daysChannel <- days
+			} else {
+				runSPKSBilling(prometheusURL, prometheusQueryArr, logger, allMetrics, salesOrder, UnitID, c.Context)
+			}
 
 			for {
 				select {
@@ -74,6 +79,12 @@ func SpksCMD(allMetrics map[string]map[string]prometheus.Counter, ctx context.Co
 				case <-ticker.C:
 					// this runs every 24 hours after program start
 					runSPKSBilling(prometheusURL, prometheusQueryArr, logger, allMetrics, salesOrder, UnitID, c.Context)
+				case <-daysChannel:
+					runSPKSBilling(prometheusURL, prometheusQueryArr, logger, allMetrics, salesOrder, UnitID, c.Context)
+					if days > 0 {
+						days--
+						daysChannel <- days
+					}
 				}
 			}
 		},
@@ -81,7 +92,7 @@ func SpksCMD(allMetrics map[string]map[string]prometheus.Counter, ctx context.Co
 }
 
 func runSPKSBilling(prometheusURL string, prometheusQueryArr [4]string, logger logr.Logger, allMetrics map[string]map[string]prometheus.Counter, salesOrder string, UnitID string, c context.Context) {
-	var startYesterdayAbsolute time.Time
+	// var startYesterdayAbsolute time.Time
 	location, err := time.LoadLocation("Europe/Zurich")
 	if err != nil {
 		allMetrics["odooMetrics"]["odooFailed"].Inc()
@@ -89,17 +100,12 @@ func runSPKSBilling(prometheusURL string, prometheusQueryArr [4]string, logger l
 	now := time.Now().In(location)
 	// this variable is necessary to query Prometheus, with timerange [1d:1d] it returns data from 1 day up to midnight
 	startOfToday := time.Date(now.Year(), now.Month(), now.Day()-days, 0, 0, 0, 0, location)
-
-	if days != 0 {
-		startYesterdayAbsolute = time.Date(now.Year(), now.Month(), now.Day()-days, 0, 0, 0, 0, location).In(time.UTC)
-	} else {
-		startYesterdayAbsolute = time.Date(now.Year(), now.Month(), now.Day()-1, 0, 0, 0, 0, location).In(time.UTC)
-	}
+	startYesterdayAbsolute := time.Date(now.Year(), now.Month(), now.Day()-days-1, 0, 0, 0, 0, location).In(time.UTC)
 
 	endYesterdayAbsolute := startYesterdayAbsolute.Add(24 * time.Hour)
 
 	logger.Info("Running SPKS billing with such timeranges: ", "startOfToday", startOfToday, "startYesterdayAbsolute", startYesterdayAbsolute.Local(), "endYesterdayAbsolute", endYesterdayAbsolute.Local())
-	return
+
 	odooClient := odoo.NewOdooAPIClient(c, odooURL, odooOauthTokenURL, odooClientId, odooClientSecret, logger, allMetrics["odooMetrics"])
 
 	mariadbStandard, mariadbPremium, redisStandard, redisPremium, err := getDatabasesCounts(prometheusURL, prometheusQueryArr, logger, startOfToday, allMetrics)
