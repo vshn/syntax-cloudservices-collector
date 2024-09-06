@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -38,6 +39,12 @@ const (
 	namespaceLabel = "crossplane.io/claim-namespace"
 )
 
+type ObjectStorageData struct {
+	cloudscale.BucketMetricsData
+	BucketDetail
+	Organization string
+}
+
 func NewObjectStorage(client *cloudscale.Client, k8sClient k8s.Client, controlApiClient k8s.Client, salesOrder, clusterId string, cloudZone string, uomMapping map[string]string, providerMetrics map[string]prometheus.Counter) (*ObjectStorage, error) {
 	return &ObjectStorage{
 		client:           client,
@@ -61,8 +68,29 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 	if err != nil {
 		o.providerMetrics["providerFailed"].Inc()
 		return nil, err
-	} else {
-		o.providerMetrics["providerSucceeded"].Inc()
+	}
+
+	bucketMap := make(map[string]*ObjectStorageData)
+
+	// create a map with bucket name as key, this way we match buckets created manually and not via Appcat service
+	for i, bucketMetric := range bucketMetrics.Data {
+		bucketMap[bucketMetric.Subject.BucketName] = &ObjectStorageData{
+			BucketMetricsData: bucketMetrics.Data[i],
+		}
+	}
+
+	// Since our buckets are always created in the convention $namespace.$bucketname, we can extract the namespace from the bucket name by splitting it.
+	// However, we need to fetch the user details to get the actual namespace.
+	for _, bucket := range bucketMap {
+		// fetch bucket user by id
+		logger.Info("fetching user details", "userID", bucket.Subject.ObjectsUserID)
+		userDetails, err := o.client.ObjectsUsers.Get(ctx, bucket.Subject.ObjectsUserID)
+		if err != nil {
+			o.providerMetrics["providerFailed"].Inc()
+			logger.Error(err, "unknown userID, something broke here fatally")
+			return nil, err
+		}
+		bucket.BucketDetail.Namespace = strings.Split(userDetails.DisplayName, ".")[0]
 	}
 
 	// Fetch organisations in case salesOrder is missing
@@ -71,6 +99,7 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 		logger.V(1).Info("Sales order id is missing, fetching namespaces to get the associated org id")
 		nsTenants, err = kubernetes.FetchNamespaceWithOrganizationMap(ctx, o.k8sClient)
 		if err != nil {
+			o.providerMetrics["providerFailed"].Inc()
 			return nil, err
 		}
 	}
@@ -79,37 +108,45 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 
 	buckets, err := fetchBuckets(ctx, o.k8sClient)
 	if err != nil {
+		o.providerMetrics["providerFailed"].Inc()
 		return nil, err
 	}
 
-	allRecords := make([]odoo.OdooMeteredBillingRecord, 0)
-	for _, bucketMetricsData := range bucketMetrics.Data {
-		name := bucketMetricsData.Subject.BucketName
-		logger = logger.WithValues("bucket", name)
-		bd, ok := buckets[name]
-		if !ok {
-			logger.Info("unable to sync bucket, ObjectBucket not found")
-			continue
+	for bucket := range bucketMap {
+		bucketName := bucketMap[bucket].BucketMetricsData.Subject.BucketName
+		if val, ok := buckets[bucketName]; ok {
+			bucketMap[bucket].Zone = val.Zone
 		}
+
+		// assign organisation to bucketMap
+		if val, ok := nsTenants[bucketMap[bucket].Namespace]; ok {
+			bucketMap[bucket].Organization = val
+		}
+
+	}
+
+	allRecords := make([]odoo.OdooMeteredBillingRecord, 0)
+	for _, bucket := range bucketMap {
+
 		appuioManaged := true
 		salesOrder := o.salesOrder
 		if salesOrder == "" {
 			appuioManaged = false
-			salesOrder, err = controlAPI.GetSalesOrder(ctx, o.controlApiClient, nsTenants[bd.Namespace])
+			salesOrder, err = controlAPI.GetSalesOrder(ctx, o.controlApiClient, bucket.Organization)
 			if err != nil {
-				logger.Error(err, "unable to sync bucket", "namespace", bd.Namespace)
+				logger.Error(err, "unable to sync bucket", "namespace", bucket)
 				continue
 			}
 		}
-		records, err := o.createOdooRecord(bucketMetricsData, bd, appuioManaged, salesOrder, billingDate)
+		records, err := o.createOdooRecord(bucket.BucketMetricsData, bucket.BucketDetail, appuioManaged, salesOrder, billingDate)
 		if err != nil {
-			logger.Error(err, "unable to create Odoo Record", "namespace", bd.Namespace)
+			logger.Error(err, "unable to create Odoo Record", "namespace", bucket.Namespace)
 			continue
 		}
 		allRecords = append(allRecords, records...)
-		logger.V(1).Info("Created Odoo records", "namespace", bd.Namespace, "records", records)
+		logger.V(1).Info("Created Odoo records", "namespace", bucket, "records", records)
 	}
-
+	o.providerMetrics["providerSucceeded"].Inc()
 	return allRecords, nil
 }
 

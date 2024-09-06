@@ -71,14 +71,22 @@ func main() {
 	ctx, stop, app := newApp()
 	defer stop()
 
-	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		err := http.ListenAndServe(":2112", nil)
-		if err != nil {
-			fmt.Println("Error starting prometheus server: ", err.Error())
+	go func(ctx context.Context) {
+		ctxx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		select {
+		case <-ctxx.Done():
+			fmt.Println("Shutting down prometheus server")
+			return
+		default:
+			http.Handle("/metrics", promhttp.Handler())
+			err := http.ListenAndServe(":2112", nil)
+			if err != nil {
+				fmt.Println("Error starting prometheus server: ", err.Error())
+			}
+			os.Exit(1)
 		}
-		os.Exit(1)
-	}()
+	}(ctx)
 
 	err := app.RunContext(ctx, os.Args)
 	// If required flags aren't set, it will return with error before we could set up logging

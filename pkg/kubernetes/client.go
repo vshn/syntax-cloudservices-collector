@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	orgv1 "github.com/appuio/control-api/apis/organization/v1"
-	"github.com/vshn/billing-collector-cloudservices/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -77,7 +76,6 @@ func restConfig(kubeconfig string, url string, token string) (*rest.Config, erro
 }
 
 func FetchNamespaceWithOrganizationMap(ctx context.Context, k8sClient client.Client) (map[string]string, error) {
-	logger := log.Logger(ctx)
 
 	gvk := schema.GroupVersionKind{
 		Group:   "",
@@ -96,7 +94,6 @@ func FetchNamespaceWithOrganizationMap(ctx context.Context, k8sClient client.Cli
 	for _, ns := range list.Items {
 		orgLabel, ok := ns.GetLabels()[OrganizationLabel]
 		if !ok {
-			logger.Info("Organization label not found in namespace", "namespace", ns.GetName())
 			continue
 		}
 		namespaces[ns.GetName()] = orgLabel
