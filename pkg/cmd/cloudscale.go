@@ -123,7 +123,7 @@ func CloudscaleCmds(allMetrics map[string]map[string]prometheus.Counter) *cli.Co
 			wg.Add(1)
 			go func() {
 				for {
-					if true {
+					if time.Now().Hour() >= billingHour {
 
 						billingDate := time.Now().In(location)
 						if days != 0 {
@@ -136,19 +136,21 @@ func CloudscaleCmds(allMetrics map[string]map[string]prometheus.Counter) *cli.Co
 							logger.Error(err, "could not collect cloudscale bucket metrics")
 							wg.Done()
 						}
+
 						if len(metrics) == 0 {
 							logger.Info("No data to export to odoo", "date", billingDate)
 							time.Sleep(time.Hour)
 							continue
 						}
+
 						logger.Info("Exporting data to Odoo", "billingHour", billingHour, "date", billingDate)
 						err = odooClient.SendData(metrics)
 						if err != nil {
 							logger.Error(err, "could not export cloudscale bucket metrics")
 						}
-						time.Sleep(time.Hour * time.Duration(15))
+						time.Sleep(time.Hour * time.Duration(collectInterval))
 					}
-					time.Sleep(time.Minute * 1)
+					time.Sleep(time.Hour)
 				}
 			}()
 			wg.Wait()
