@@ -87,10 +87,10 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 		userDetails, err := o.client.ObjectsUsers.Get(ctx, bucket.Subject.ObjectsUserID)
 		if err != nil {
 			o.providerMetrics["providerFailed"].Inc()
-			logger.Error(err, "unknown userID, something broke here fatally")
-			return nil, err
+			logger.Error(err, "unknown userID, something broke here fatally", "bucketName:", bucket.Subject.BucketName)
+		} else {
+			bucket.BucketDetail.Namespace = strings.Split(userDetails.DisplayName, ".")[0]
 		}
-		bucket.BucketDetail.Namespace = strings.Split(userDetails.DisplayName, ".")[0]
 	}
 
 	// Fetch organisations in case salesOrder is missing
@@ -100,7 +100,7 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 		nsTenants, err = kubernetes.FetchNamespaceWithOrganizationMap(ctx, o.k8sClient)
 		if err != nil {
 			o.providerMetrics["providerFailed"].Inc()
-			return nil, err
+			logger.Error(err, "unable to fetch namespaces with organization")
 		}
 	}
 
@@ -134,8 +134,15 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 			appuioManaged = false
 			salesOrder, err = controlAPI.GetSalesOrder(ctx, o.controlApiClient, bucket.Organization)
 			if err != nil {
-				logger.Error(err, "unable to sync bucket", "namespace", bucket)
-				continue
+				if strings.Contains(err.Error(), "Rados gw user") {
+					// we can't do anything about this, so we skip the bucket, will be fixed in future
+					logger.V(1).Info("Skipping bucket", "namespace", bucket)
+					continue
+				} else {
+					logger.Error(err, "unable to sync bucket", "namespace", bucket)
+					// increase prometheus provider failed metric
+					o.providerMetrics["providerFailed"].Inc()
+				}
 			}
 		}
 		records, err := o.createOdooRecord(bucket.BucketMetricsData, bucket.BucketDetail, appuioManaged, salesOrder, billingDate)

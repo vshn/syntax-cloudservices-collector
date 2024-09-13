@@ -65,6 +65,7 @@ func SpksCMD(allMetrics map[string]map[string]prometheus.Counter, ctx context.Co
 			ticker := time.NewTicker(24 * time.Hour)
 
 			daysChannel := make(chan int, 1)
+			// this logic ensures backfilling of data
 			if days != 0 {
 				daysChannel <- days
 			} else {

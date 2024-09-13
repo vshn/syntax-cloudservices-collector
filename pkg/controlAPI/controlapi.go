@@ -11,6 +11,10 @@ import (
 func GetSalesOrder(ctx context.Context, k8sClient client.Client, orgId string) (string, error) {
 
 	org := &orgv1.Organization{}
+	if orgId == "" {
+		// this is a case for Appuio Cloud where the org annotation is not set for the vshn managed namespaces
+		orgId = "vshn"
+	}
 	err := k8sClient.Get(ctx, client.ObjectKey{Name: orgId}, org)
 	if err != nil {
 		return "", fmt.Errorf("cannot get Organization object '%s', err: %v", orgId, err)

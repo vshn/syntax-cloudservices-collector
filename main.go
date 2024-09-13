@@ -71,13 +71,15 @@ func main() {
 	ctx, stop, app := newApp()
 	defer stop()
 
+	// intercept signals to gracefully shutdown the server
+
 	go func(ctx context.Context) {
 		ctxx, cancel := context.WithCancel(ctx)
-		defer cancel()
 		select {
 		case <-ctxx.Done():
+			cancel()
 			fmt.Println("Shutting down prometheus server")
-			return
+			os.Exit(1)
 		default:
 			http.Handle("/metrics", promhttp.Handler())
 			err := http.ListenAndServe(":2112", nil)
@@ -103,7 +105,7 @@ func newApp() (context.Context, context.CancelFunc, *cli.App) {
 		logFormat string
 	)
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	app := &cli.App{
 		Name:    appName,
@@ -181,7 +183,7 @@ func newApp() (context.Context, context.CancelFunc, *cli.App) {
 		},
 		Commands: []*cli.Command{
 			cmd.ExoscaleCmds(allMetrics),
-			cmd.CloudscaleCmds(allMetrics),
+			cmd.CloudscaleCmds(allMetrics, ctx),
 			cmd.SpksCMD(allMetrics, ctx),
 		},
 		ExitErrHandler: func(c *cli.Context, err error) {
