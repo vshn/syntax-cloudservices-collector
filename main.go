@@ -71,14 +71,24 @@ func main() {
 	ctx, stop, app := newApp()
 	defer stop()
 
-	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		err := http.ListenAndServe(":2112", nil)
-		if err != nil {
-			fmt.Println("Error starting prometheus server: ", err.Error())
+	// intercept signals to gracefully shutdown the server
+
+	go func(ctx context.Context) {
+		ctxx, cancel := context.WithCancel(ctx)
+		select {
+		case <-ctxx.Done():
+			cancel()
+			fmt.Println("Shutting down prometheus server")
+			os.Exit(1)
+		default:
+			http.Handle("/metrics", promhttp.Handler())
+			err := http.ListenAndServe(":2112", nil)
+			if err != nil {
+				fmt.Println("Error starting prometheus server: ", err.Error())
+			}
+			os.Exit(1)
 		}
-		os.Exit(1)
-	}()
+	}(ctx)
 
 	err := app.RunContext(ctx, os.Args)
 	// If required flags aren't set, it will return with error before we could set up logging
@@ -95,7 +105,7 @@ func newApp() (context.Context, context.CancelFunc, *cli.App) {
 		logFormat string
 	)
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	app := &cli.App{
 		Name:    appName,
@@ -173,7 +183,7 @@ func newApp() (context.Context, context.CancelFunc, *cli.App) {
 		},
 		Commands: []*cli.Command{
 			cmd.ExoscaleCmds(allMetrics),
-			cmd.CloudscaleCmds(allMetrics),
+			cmd.CloudscaleCmds(allMetrics, ctx),
 			cmd.SpksCMD(allMetrics, ctx),
 		},
 		ExitErrHandler: func(c *cli.Context, err error) {

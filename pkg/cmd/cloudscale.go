@@ -1,12 +1,13 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"net/http"
-	"os"
-	"sync"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/vshn/billing-collector-cloudservices/pkg/odoo"
 
@@ -20,7 +21,7 @@ import (
 const defaultTextForRequiredFlags = "<required>"
 const defaultTextForOptionalFlags = "<optional>"
 
-func CloudscaleCmds(allMetrics map[string]map[string]prometheus.Counter) *cli.Command {
+func CloudscaleCmds(allMetrics map[string]map[string]prometheus.Counter, ctx context.Context) *cli.Command {
 	var (
 		apiToken          string
 		kubeconfig        string
@@ -76,7 +77,7 @@ func CloudscaleCmds(allMetrics map[string]map[string]prometheus.Counter) *cli.Co
 		Before: addCommandName,
 		Action: func(c *cli.Context) error {
 			logger := log.Logger(c.Context)
-			var wg sync.WaitGroup
+			//var wg sync.WaitGroup
 
 			logger.Info("Checking UOM mappings")
 			mapping, err := odoo.LoadUOM(uom)
@@ -120,42 +121,122 @@ func CloudscaleCmds(allMetrics map[string]map[string]prometheus.Counter) *cli.Co
 				collectInterval = 23
 			}
 
-			wg.Add(1)
+			hookChannel, hookResponseChannel := make(chan string), make(chan string)
+
+			// start gin server as gorouitine with context to cancel early
 			go func() {
-				for {
-					if time.Now().Hour() >= billingHour {
 
-						billingDate := time.Now().In(location)
-						if days != 0 {
-							billingDate = time.Date(billingDate.Year(), billingDate.Month(), billingDate.Day()-days, 0, 0, 0, 0, billingDate.Location())
-						}
+				gin.SetMode(gin.DebugMode)
+				r := gin.Default()
+				r.POST("/bill/:bucket", func(c *gin.Context) {
+					bucketName := c.Param("bucket")
+					logger.Info("Received request to bill bucket", "bucket", bucketName)
+					hookChannel <- bucketName
 
-						logger.V(1).Info("Running cloudscale collector")
-						metrics, err := o.GetMetrics(c.Context, billingDate)
-						if err != nil {
-							logger.Error(err, "could not collect cloudscale bucket metrics")
-							wg.Done()
-						}
-
-						if len(metrics) == 0 {
-							logger.Info("No data to export to odoo", "date", billingDate)
-							time.Sleep(time.Hour)
-							continue
-						}
-
-						logger.Info("Exporting data to Odoo", "billingHour", billingHour, "date", billingDate)
-						err = odooClient.SendData(metrics)
-						if err != nil {
-							logger.Error(err, "could not export cloudscale bucket metrics")
-						}
-						time.Sleep(time.Hour * time.Duration(collectInterval))
+					select {
+					case <-time.After(15 * time.Second):
+						logger.Info("Timeout waiting for response from hook")
+						c.JSON(500, gin.H{"message": "timeout"})
+					case response := <-hookResponseChannel:
+						logger.Info("Received response from hook", "response", response)
+						c.JSON(200, gin.H{"message": response})
 					}
-					time.Sleep(time.Hour)
+
+				})
+				err := r.Run(":2113")
+				if err != nil {
+					logger.Error(err, "could not start gin server")
 				}
 			}()
-			wg.Wait()
-			os.Exit(1)
-			return nil
+
+			ticker := time.NewTicker(time.Hour * 15)
+
+			// ensure at least one run at startup
+			runCloudscaleBilling(c, allMetrics, logger, o, odooClient, days, billingHour, location)
+			for {
+				select {
+				case <-ctx.Done():
+					// this is really important as we need normal mechanism to exit early if needed
+					// workgroup and sleeping for 1 hour basically holds process until it is killed
+					logger.Info("Received Context cancellation, exiting...")
+					return nil
+				case <-ticker.C:
+					runCloudscaleBilling(c, allMetrics, logger, o, odooClient, days, billingHour, location)
+				case x := <-hookChannel:
+					logger.Info("\n\n\n\nReceived hook to bill bucket", "bucket", x)
+
+					go func() {
+						hookResponseChannel <- "OK, Bucket billed"
+					}()
+
+				}
+			}
 		},
 	}
 }
+
+func runCloudscaleBilling(c *cli.Context, allMetrics map[string]map[string]prometheus.Counter, logger logr.Logger, o *cs.ObjectStorage, odooClient *odoo.OdooAPIClient, days int, billingHour int, location *time.Location) {
+	logger.Info("\n\n\n\n\n\nChecking time")
+	// this runs every 24 hours after program start
+	billingDate := time.Now().In(location)
+	if days != 0 {
+		billingDate = time.Date(billingDate.Year(), billingDate.Month(), billingDate.Day()-days, 0, 0, 0, 0, billingDate.Location())
+	}
+
+	logger.V(1).Info("Running cloudscale collector")
+	metrics, err := o.GetMetrics(c.Context, billingDate)
+	if err != nil {
+		logger.Error(err, "could not collect cloudscale bucket metrics")
+		allMetrics["providerMetrics"]["cloudscaleFailed"].Inc()
+	}
+
+	if len(metrics) == 0 {
+		logger.Info("No data to export to odoo", "date", billingDate)
+	} else {
+		logger.Info("Exporting data to Odoo", "billingHour", billingHour, "date", billingDate)
+		err = odooClient.SendData(metrics)
+		if err != nil {
+			logger.Error(err, "could not export cloudscale bucket metrics")
+			// increase failed metrics
+			allMetrics["odooMetrics"]["odooFailed"].Inc()
+		}
+	}
+}
+
+// wg.Add(1)
+// go func() {
+// 	for {
+// 		//if time.Now().Hour() >= billingHour {
+// 		if true {
+
+// 			billingDate := time.Now().In(location)
+// 			if days != 0 {
+// 				billingDate = time.Date(billingDate.Year(), billingDate.Month(), billingDate.Day()-days, 0, 0, 0, 0, billingDate.Location())
+// 			}
+
+// 			logger.V(1).Info("Running cloudscale collector")
+// 			metrics, err := o.GetMetrics(c.Context, billingDate)
+// 			if err != nil {
+// 				logger.Error(err, "could not collect cloudscale bucket metrics")
+// 				wg.Done()
+// 			}
+
+// 			if len(metrics) == 0 {
+// 				logger.Info("No data to export to odoo", "date", billingDate)
+// 				time.Sleep(time.Hour)
+// 				continue
+// 			}
+// 			return
+// 			logger.Info("Exporting data to Odoo", "billingHour", billingHour, "date", billingDate)
+// 			err = odooClient.SendData(metrics)
+// 			if err != nil {
+// 				logger.Error(err, "could not export cloudscale bucket metrics")
+// 			}
+// 			time.Sleep(time.Hour * time.Duration(collectInterval))
+// 		}
+// 		time.Sleep(time.Hour)
+// 	}
+// }()
+// wg.Wait()
+// os.Exit(1)
+// return nil
