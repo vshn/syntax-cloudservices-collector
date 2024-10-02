@@ -81,14 +81,16 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 
 	// Since our buckets are always created in the convention $namespace.$bucketname, we can extract the namespace from the bucket name by splitting it.
 	// However, we need to fetch the user details to get the actual namespace.
-	for _, bucket := range bucketMap {
+	for key, bucket := range bucketMap {
 		// fetch bucket user by id
 		logger.Info("fetching user details", "userID", bucket.Subject.ObjectsUserID)
 		userDetails, err := o.client.ObjectsUsers.Get(ctx, bucket.Subject.ObjectsUserID)
 		if err != nil {
 			o.providerMetrics["providerFailed"].Inc()
-			logger.Error(err, "unknown userID, something broke here fatally")
-			return nil, err
+			logger.Error(err, "unknown userID, something broke here fatally", "userID", bucket.Subject.ObjectsUserID, "bucket", bucket)
+			// deleting this bucket as it's unsuable
+			delete(bucketMap, key)
+			continue
 		}
 		bucket.BucketDetail.Namespace = strings.Split(userDetails.DisplayName, ".")[0]
 	}
