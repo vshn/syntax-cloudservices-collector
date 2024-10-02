@@ -132,9 +132,14 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 		salesOrder := o.salesOrder
 		if salesOrder == "" {
 			appuioManaged = false
+			if bucket.Organization == "" {
+				// in cases that our VSHN services are using buckets, then Organization is not set, we must default it to "vshn"
+				// we can't set it in cluster as for customers as then we might run into scheduling issues
+				bucket.Organization = "vshn"
+			}
 			salesOrder, err = controlAPI.GetSalesOrder(ctx, o.controlApiClient, bucket.Organization)
 			if err != nil {
-				logger.Error(err, "unable to sync bucket", "namespace", bucket)
+				logger.Error(err, "unable to sync bucket", "namespace", bucket, "reason", err)
 				continue
 			}
 		}
