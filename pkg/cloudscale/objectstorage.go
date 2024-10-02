@@ -114,17 +114,15 @@ func (o *ObjectStorage) GetMetrics(ctx context.Context, billingDate time.Time) (
 		return nil, err
 	}
 
-	for bucket := range bucketMap {
-		bucketName := bucketMap[bucket].BucketMetricsData.Subject.BucketName
-		if val, ok := buckets[bucketName]; ok {
-			bucketMap[bucket].Zone = val.Zone
+	for name, bucket := range bucketMap {
+		if val, ok := buckets[name]; ok {
+			bucket.Zone = val.Zone
 		}
 
 		// assign organisation to bucketMap
-		if val, ok := nsTenants[bucketMap[bucket].Namespace]; ok {
-			bucketMap[bucket].Organization = val
+		if val, ok := nsTenants[bucket.Namespace]; ok {
+			bucket.Organization = val
 		}
-
 	}
 
 	allRecords := make([]odoo.OdooMeteredBillingRecord, 0)
