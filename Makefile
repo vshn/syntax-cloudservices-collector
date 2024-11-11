@@ -32,10 +32,6 @@ build-docker: ## Build docker image
 		go build -o ${BIN_FILENAME}
 	$(DOCKER_CMD) build --platform $(DOCKER_IMAGE_GOOS)/$(DOCKER_IMAGE_GOARCH) -t $(CONTAINER_IMG) .
 
-.PHONY: docs-serve
-docs-serve: ## Preview the documentation
-	$(ANTORA_PREVIEW_CMD)
-
 .PHONY: test
 test: test-go ## All-in-one test
 

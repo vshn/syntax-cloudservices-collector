@@ -12,7 +12,7 @@ Batch job to sync usage data from the Exoscale and Cloudscale API to Odoo16.
 
 Metrics are collected based on [metered billing data flow](https://docs.central.vshn.ch/metered-billing-data-flow.html)
 
-See the [component documentation](https://hub.syn.tools/billing-collector-cloudservices/index.html) for more information.
+See the [documentation](https://kb.vshn.ch/app-catalog/reference/cloud-usage-reporting.html) for more information.
 
 ## APPUiO Cloud vs APPUiO Managed
 

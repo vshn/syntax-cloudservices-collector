@@ -1,6 +1,0 @@
-name: billing-collector-cloudservices
-title: billing-collector-cloudservices
-version: master
-start_page: ROOT:index.adoc
-nav:
-  - modules/ROOT/partials/nav.adoc

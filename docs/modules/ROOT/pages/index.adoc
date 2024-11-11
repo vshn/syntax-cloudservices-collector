@@ -1,7 +1,0 @@
-= billing-collector-cloudservices
-
-Controller to sync usage data from the Exoscale and Cloudscale metrics APIs to Odoo16
-
-Metrics are collected taking into account product (e.g. `object-storage-storage:exoscale`), source (e.g. `exoscale:namespace`), tenant (organization) and date time.
-
-On DBaaS, we also gather information by Plan. That can be seeing in the product. For example, in the case of a PostgreSQL database service, product may look like `appcat-exoscale-pg-hobbyist-2`.

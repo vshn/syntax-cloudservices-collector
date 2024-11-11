@@ -1,4 +1,0 @@
-* xref:index.adoc[Home]
-* xref:how-tos/installation.adoc[Installation]
-* xref:how-tos/multi-instance.adoc[Multi Instance]
-* xref:references/parameters.adoc[Parameters]
